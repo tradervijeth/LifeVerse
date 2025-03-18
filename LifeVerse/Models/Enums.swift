@@ -31,15 +31,3 @@ enum Residence: String, Codable {
     case homeless = "Homeless"
 }
 
-// Models/Career.swift
-
-import Foundation
-
-struct Career: Codable, Identifiable {
-    var id = UUID()
-    var title: String
-    var company: String
-    var salary: Double
-    var performanceRating: Int = 50 // 0-100
-    var yearsAtJob: Int = 0
-}
