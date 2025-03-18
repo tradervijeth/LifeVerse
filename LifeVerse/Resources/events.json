@@ -1,0 +1,22 @@
+{
+  "randomEvents": [
+    {
+      "title": "Found Money",
+      "description": "You found $20 on the sidewalk!",
+      "type": "financial",
+      "minAge": 5,
+      "maxAge": 100,
+      "probability": 0.1,
+      "choices": null
+    },
+    {
+      "title": "Caught a Cold",
+      "description": "You caught a nasty cold.",
+      "type": "health",
+      "minAge": 0,
+      "maxAge": 100,
+      "probability": 0.2,
+      "choices": null
+    }
+  ]
+}
