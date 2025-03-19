@@ -12,27 +12,59 @@ struct CharacterInfoHeader: View {
     let currentYear: Int
     
     var body: some View {
-        VStack(spacing: 5) {
-            Text("\(character.name), Age \(character.age)")
-                .font(.title)
-                .fontWeight(.bold)
-            
-            Text("\(currentYear)")
-                .font(.subheadline)
-            
-            HStack(spacing: 20) {
-                StatView(label: "Health", value: character.health, color: .red)
-                StatView(label: "Happy", value: character.happiness, color: .yellow)
-                StatView(label: "Intel", value: character.intelligence, color: .blue)
-                StatView(label: "Looks", value: character.looks, color: .purple)
-                StatView(label: "Athle", value: character.athleticism, color: .green)
+        VStack(spacing: 6) {
+            // Character name and age
+            HStack {
+                Text("\(character.name)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Text("Age \(character.age)")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
             }
-            .padding(.vertical, 5)
             
-            Text("💰 $\(Int(character.money))")
-                .font(.headline)
+            // Year
+            Text("\(currentYear)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.bottom, 4)
+            
+            // Stats with emojis
+            HStack(spacing: 8) {
+                EmojiStatView(label: "Health", emoji: "❤️", value: character.health, color: .red)
+                EmojiStatView(label: "Happy", emoji: "😊", value: character.happiness, color: .yellow)
+                EmojiStatView(label: "Smart", emoji: "🧠", value: character.intelligence, color: .blue)
+                EmojiStatView(label: "Looks", emoji: "😎", value: character.looks, color: .purple)
+                EmojiStatView(label: "Fitness", emoji: "💪", value: character.athleticism, color: .green)
+            }
+            .padding(.horizontal)
+            
+            // Money
+            HStack {
+                Text("💰")
+                    .font(.title3)
+                
+                Text("$\(Int(character.money).formattedWithSeparator())")
+                    .font(.headline)
+                    .fontWeight(.medium)
+            }
+            .padding(.top, 4)
         }
         .padding()
-        .background(Color.gray.opacity(0.1))
+        .frame(maxWidth: .infinity)
+        .background(Color(UIColor.secondarySystemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+        .padding(.horizontal)
+    }
+}
+
+// Extension to format number with thousand separators
+extension Int {
+    func formattedWithSeparator() -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: self)) ?? "\(self)"
     }
 }

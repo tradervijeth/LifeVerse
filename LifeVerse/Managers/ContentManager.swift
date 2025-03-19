@@ -92,4 +92,3 @@ class ContentManager {
         return randomEvents
     }
 }
-
