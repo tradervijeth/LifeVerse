@@ -42,6 +42,14 @@ class GameManager: ObservableObject {
         
         currentYear += 1
         let newEvents = character.ageUp()
+        
+        // Process automatic events
+        for event in newEvents {
+            if event.choices == nil && event.effects != nil {
+                applyEventEffects(event.effects!, to: &character)
+            }
+        }
+        
         self.character = character
         currentEvents = newEvents
         
@@ -51,6 +59,28 @@ class GameManager: ObservableObject {
         
         // Auto-save the game after each year
         _ = SaveSystem.saveGame(gameManager: self)
+    }
+    
+ 
+    private func applyEventEffects(_ effects: [EventChoice.CharacterEffect], to character: inout Character) {
+        for effect in effects {
+            switch effect.attribute {
+            case "health":
+                character.health = max(0, min(100, character.health + effect.change))
+            case "happiness":
+                character.happiness = max(0, min(100, character.happiness + effect.change))
+            case "intelligence":
+                character.intelligence = max(0, min(100, character.intelligence + effect.change))
+            case "looks":
+                character.looks = max(0, min(100, character.looks + effect.change))
+            case "athleticism":
+                character.athleticism = max(0, min(100, character.athleticism + effect.change))
+            case "money":
+                character.money += Double(effect.change)
+            default:
+                break
+            }
+        }
     }
     
     func makeChoice(for event: LifeEvent, choice: EventChoice) {

@@ -14,6 +14,7 @@ struct LifeEvent: Codable, Identifiable {
     var year: Int
     var choices: [EventChoice]? = nil
     var outcome: String? = nil
+    var effects: [EventChoice.CharacterEffect]? = nil
     
     enum EventType: String, Codable {
         case birth
@@ -25,6 +26,17 @@ struct LifeEvent: Codable, Identifiable {
         case financial
         case random
         case death
+    }
+    
+    init(title: String, description: String, type: EventType, year: Int, choices: [EventChoice]? = nil, outcome: String? = nil, effects: [EventChoice.CharacterEffect]? = nil) {
+        self.id = UUID()
+        self.title = title
+        self.description = description
+        self.type = type
+        self.year = year
+        self.choices = choices
+        self.outcome = outcome
+        self.effects = effects
     }
 }
 
