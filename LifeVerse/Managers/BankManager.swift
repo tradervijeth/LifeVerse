@@ -10,6 +10,7 @@ class BankManager: ObservableObject, Codable {
     @Published var accounts: [BankAccount] = []
     @Published var creditScore: Int = 650 // Starting credit score (300-850 range)
     @Published var collateralAssets: [LoanCollateral] = []
+    @Published var propertyInvestments: [PropertyInvestment] = [] // Property investments collection
     @Published var marketCondition: MarketCondition = .expansion // Current economic condition
     @Published var transactionHistory: [BankTransaction] = [] // Global transaction history
     @Published var overdraftProtection: Bool = false // Whether overdraft protection is enabled
@@ -17,7 +18,7 @@ class BankManager: ObservableObject, Codable {
     
     // Coding keys for Codable conformance
     enum CodingKeys: String, CodingKey {
-        case accounts, creditScore, collateralAssets, marketCondition, transactionHistory, overdraftProtection, creditReportRequests
+        case accounts, creditScore, collateralAssets, propertyInvestments, marketCondition, transactionHistory, overdraftProtection, creditReportRequests
     }
     
     // Required for Codable when using @Published
@@ -28,6 +29,7 @@ class BankManager: ObservableObject, Codable {
         
         // Decode new properties with backward compatibility
         collateralAssets = try container.decodeIfPresent([LoanCollateral].self, forKey: .collateralAssets) ?? []
+        propertyInvestments = try container.decodeIfPresent([PropertyInvestment].self, forKey: .propertyInvestments) ?? []
         marketCondition = try container.decodeIfPresent(MarketCondition.self, forKey: .marketCondition) ?? .expansion
         transactionHistory = try container.decodeIfPresent([BankTransaction].self, forKey: .transactionHistory) ?? []
         overdraftProtection = try container.decodeIfPresent(Bool.self, forKey: .overdraftProtection) ?? false
@@ -40,6 +42,7 @@ class BankManager: ObservableObject, Codable {
         try container.encode(accounts, forKey: .accounts)
         try container.encode(creditScore, forKey: .creditScore)
         try container.encode(collateralAssets, forKey: .collateralAssets)
+        try container.encode(propertyInvestments, forKey: .propertyInvestments)
         try container.encode(marketCondition, forKey: .marketCondition)
         try container.encode(transactionHistory, forKey: .transactionHistory)
         try container.encode(overdraftProtection, forKey: .overdraftProtection)
