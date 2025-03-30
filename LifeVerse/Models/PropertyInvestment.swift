@@ -29,7 +29,12 @@ struct PropertyInvestment: Codable, Identifiable {
     var rentalTransactions: [RentalTransaction] = []
     
     // Property location (for tax purposes)
-    private var _location: PropertyLocation? = .suburban
+    private var _location: PropertyLocation = .suburban
+    
+    var location: PropertyLocation {
+        get { return _location }
+        set { _location = newValue }
+    }
     
     // Initialize a new property investment
     init(collateralId: UUID, purchasePrice: Double, purchaseYear: Int, mortgageId: UUID? = nil, location: PropertyLocation = .suburban) {

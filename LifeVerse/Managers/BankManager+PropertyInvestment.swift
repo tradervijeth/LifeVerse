@@ -249,4 +249,230 @@ extension BankManager {
         
         return principal * (rateFactorNumerator / rateFactorDenominator)
     }
+    
+    // MARK: - Property Refinancing
+    
+    // Calculate the current loan-to-value ratio for a property
+    func calculatePropertyLTV(propertyId: UUID) -> Double? {
+        guard let propertyIndex = propertyInvestments.firstIndex(where: { $0.id == propertyId }),
+              let mortgageId = propertyInvestments[propertyIndex].mortgageId,
+              let mortgageIndex = accounts.firstIndex(where: { $0.id == mortgageId }) else {
+            return nil
+        }
+        
+        let propertyValue = propertyInvestments[propertyIndex].currentValue
+        let mortgageBalance = abs(accounts[mortgageIndex].balance)
+        
+        return mortgageBalance / propertyValue
+    }
+    
+    // Check if a property is in negative equity (LTV > 1.0)
+    func isPropertyInNegativeEquity(propertyId: UUID) -> Bool {
+        guard let ltv = calculatePropertyLTV(propertyId: propertyId) else {
+            return false
+        }
+        
+        return ltv > 1.0
+    }
+    
+    // Check if a property is eligible for refinancing
+    func canRefinanceProperty(propertyId: UUID) -> (eligible: Bool, reason: String) {
+        // Find the property
+        guard let propertyIndex = propertyInvestments.firstIndex(where: { $0.id == propertyId }) else {
+            return (false, "Property not found")
+        }
+        
+        // Check if property has a mortgage
+        guard let mortgageId = propertyInvestments[propertyIndex].mortgageId,
+              let mortgageIndex = accounts.firstIndex(where: { $0.id == mortgageId }) else {
+            return (false, "Property does not have a mortgage")
+        }
+        
+        // Check credit score (minimum 620 for refinancing)
+        if creditScore < 620 {
+            return (false, "Credit score too low (minimum 620 required)")
+        }
+        
+        // Check LTV ratio (maximum 95% for refinancing)
+        let propertyValue = propertyInvestments[propertyIndex].currentValue
+        let mortgageBalance = abs(accounts[mortgageIndex].balance)
+        let ltv = mortgageBalance / propertyValue
+        
+        if ltv > 0.95 {
+            return (false, "Loan-to-value ratio too high (maximum 95% allowed)")
+        }
+        
+        // Check if mortgage is too new (minimum 6 months)
+        let mortgage = accounts[mortgageIndex]
+        if mortgage.creationYear == mortgage.lastTransactionYear && 
+           mortgage.transactions.count < 6 {
+            return (false, "Mortgage too new (minimum 6 months required)")
+        }
+        
+        return (true, "Eligible for refinancing")
+    }
+    
+    // Refinance a property with a new mortgage
+    func refinanceProperty(propertyId: UUID, newTerm: Int, cashOut: Double = 0, currentYear: Int) -> (success: Bool, newMortgage: BankAccount?, message: String) {
+        // Check eligibility
+        let eligibility = canRefinanceProperty(propertyId: propertyId)
+        if !eligibility.eligible {
+            return (false, nil, eligibility.reason)
+        }
+        
+        // Find the property and its mortgage
+        guard let propertyIndex = propertyInvestments.firstIndex(where: { $0.id == propertyId }),
+              let mortgageId = propertyInvestments[propertyIndex].mortgageId,
+              let mortgageIndex = accounts.firstIndex(where: { $0.id == mortgageId }) else {
+            return (false, nil, "Property or mortgage not found")
+        }
+        
+        let property = propertyInvestments[propertyIndex]
+        let oldMortgage = accounts[mortgageIndex]
+        let oldMortgageBalance = abs(oldMortgage.balance)
+        
+        // Calculate new loan amount (including cash out if requested)
+        let propertyValue = property.currentValue
+        var newLoanAmount = oldMortgageBalance + cashOut
+        
+        // Check if new loan amount exceeds maximum LTV (80% for cash-out, 95% for rate/term)
+        let maxLTV = cashOut > 0 ? 0.8 : 0.95
+        let maxLoanAmount = propertyValue * maxLTV
+        
+        if newLoanAmount > maxLoanAmount {
+            return (false, nil, "New loan amount exceeds maximum allowed (\(Int(maxLTV * 100))% of property value)")
+        }
+        
+        // Find the collateral asset
+        guard let collateralIndex = collateralAssets.firstIndex(where: { $0.id == property.collateralId }) else {
+            return (false, nil, "Collateral asset not found")
+        }
+        
+        // Create the new mortgage account
+        let baseInterestRate = BankAccountType.mortgage.defaultInterestRate()
+        let investmentPropertyPremium = property.isRental ? 0.005 : 0.0 // 0.5% higher for rental properties
+        
+        // Apply market condition effect to interest rate
+        let marketEffect = marketCondition.interestRateEffect()
+        
+        // Create the new mortgage
+        guard let newMortgage = openAccount(
+            type: .mortgage,
+            initialDeposit: newLoanAmount,
+            currentYear: currentYear,
+            term: newTerm,
+            collateralId: property.collateralId
+        ) else {
+            return (false, nil, "Failed to create new mortgage")
+        }
+        
+        // Adjust interest rate for the new mortgage
+        if let newMortgageIndex = accounts.firstIndex(where: { $0.id == newMortgage.id }) {
+            accounts[newMortgageIndex].interestRate += investmentPropertyPremium
+        }
+        
+        // Pay off the old mortgage
+        _ = accounts[mortgageIndex].makePayment(amount: oldMortgageBalance)
+        
+        // Close the old mortgage account
+        _ = closeAccount(accountId: oldMortgage.id)
+        
+        // Update the property's mortgage ID
+        propertyInvestments[propertyIndex].mortgageId = newMortgage.id
+        
+        // Add transaction records
+        let refinanceTransaction = BankTransaction(
+            type: .transfer,
+            amount: oldMortgageBalance,
+            description: "Refinanced mortgage for property",
+            date: Date(),
+            year: currentYear
+        )
+        transactionHistory.append(refinanceTransaction)
+        
+        // Add cash-out transaction if applicable
+        if cashOut > 0 {
+            let cashOutTransaction = BankTransaction(
+                type: .withdrawal,
+                amount: cashOut,
+                description: "Cash-out from property refinance",
+                date: Date(),
+                year: currentYear
+            )
+            transactionHistory.append(cashOutTransaction)
+        }
+        
+        return (true, newMortgage, "Successfully refinanced property")
+    }
+    
+    // Calculate maximum cash-out amount for a property
+    func calculateMaxCashOut(propertyId: UUID) -> Double {
+        guard let propertyIndex = propertyInvestments.firstIndex(where: { $0.id == propertyId }),
+              let mortgageId = propertyInvestments[propertyIndex].mortgageId,
+              let mortgageIndex = accounts.firstIndex(where: { $0.id == mortgageId }) else {
+            return 0
+        }
+        
+        let propertyValue = propertyInvestments[propertyIndex].currentValue
+        let currentMortgageBalance = abs(accounts[mortgageIndex].balance)
+        
+        // Maximum LTV for cash-out refinance is 80%
+        let maxLoanAmount = propertyValue * 0.8
+        
+        // Maximum cash-out is the difference between max loan amount and current balance
+        let maxCashOut = maxLoanAmount - currentMortgageBalance
+        
+        return max(0, maxCashOut)
+    }
+    
+    // Handle underwater mortgage (negative equity)
+    func handleUnderwaterMortgage(propertyId: UUID, currentYear: Int) -> [String] {
+        guard let propertyIndex = propertyInvestments.firstIndex(where: { $0.id == propertyId }),
+              let mortgageId = propertyInvestments[propertyIndex].mortgageId,
+              let mortgageIndex = accounts.firstIndex(where: { $0.id == mortgageId }) else {
+            return ["Property or mortgage not found"]
+        }
+        
+        let property = propertyInvestments[propertyIndex]
+        let mortgage = accounts[mortgageIndex]
+        let propertyValue = property.currentValue
+        let mortgageBalance = abs(mortgage.balance)
+        
+        // Calculate how underwater the property is
+        let underwaterAmount = mortgageBalance - propertyValue
+        let ltv = mortgageBalance / propertyValue
+        
+        var consequences = [String]()
+        
+        // Credit score impact based on severity of negative equity
+        if ltv > 1.5 { // Severely underwater (150%+ LTV)
+            adjustCreditScore(change: -50)
+            consequences.append("Severe negative equity has significantly damaged your credit score (-50 points)")
+        } else if ltv > 1.25 { // Moderately underwater (125-150% LTV)
+            adjustCreditScore(change: -30)
+            consequences.append("Moderate negative equity has damaged your credit score (-30 points)")
+        } else if ltv > 1.0 { // Slightly underwater (100-125% LTV)
+            adjustCreditScore(change: -15)
+            consequences.append("Slight negative equity has affected your credit score (-15 points)")
+        }
+        
+        // Increased interest rate due to risk
+        if ltv > 1.0 {
+            let riskPremium = min(0.02 * (ltv - 1.0) * 10, 0.05) // Up to 5% additional interest
+            accounts[mortgageIndex].interestRate += riskPremium
+            consequences.append("Mortgage interest rate increased by \(String(format: "%.2f", riskPremium * 100))% due to negative equity risk")
+        }
+        
+        // Add transaction record for the negative equity situation
+        let negativeEquityTransaction = BankTransaction(
+            type: .fee,
+            amount: underwaterAmount,
+            description: "Negative equity recorded on property",
+            date: Date(),
+            year: currentYear
+        )
+        transactionHistory.append(negativeEquityTransaction)
+        
+        return consequences
+    }
 }

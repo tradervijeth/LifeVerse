@@ -416,10 +416,12 @@ struct PropertyCard: View {
 }
 
 // Property detail view
+// Property detail view
 struct PropertyDetailView: View {
     let property: PropertyInvestment
     let bankManager: BankManager
     let currentYear: Int
+    @State private var showRefinanceSheet: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
@@ -590,6 +592,22 @@ struct PropertyDetailView: View {
                             .font(.subheadline)
                             .foregroundColor(loanToValue > 0.8 ? .red : (loanToValue > 0.5 ? .orange : .green))
                     }
+                    
+                    // Refinance button
+                    Button(action: {
+                        showRefinanceSheet = true
+                    }) {
+                        HStack {
+                            Image(systemName: "arrow.2.squarepath")
+                            Text("Refinance Mortgage")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .padding(.top, 8)
                 }
                 .padding()
                 .background(Color(UIColor.tertiarySystemBackground))
@@ -735,6 +753,14 @@ struct PropertyDetailView: View {
                 .background(Color(UIColor.tertiarySystemBackground))
                 .cornerRadius(10)
             }
+        }
+        .sheet(isPresented: $showRefinanceSheet) {
+            RefinancePropertyView(
+                bankManager: bankManager,
+                property: property,
+                currentYear: currentYear,
+                isPresented: $showRefinanceSheet
+            )
         }
     }
     
