@@ -7,6 +7,12 @@
 import Foundation
 
 struct PropertyInvestment: Codable, Identifiable {
+    // Coding keys for Codable conformance
+    enum CodingKeys: String, CodingKey {
+        case id, collateralId, purchasePrice, purchaseYear, currentValue, mortgageId, isRental, monthlyRent
+        case occupancyRate, propertyTaxRate, maintenanceCostRate, insuranceCostRate, propertyManagerFeeRate
+        case rentalTransactions, location
+    }
     var id = UUID()
     var collateralId: UUID // Reference to the LoanCollateral asset
     var purchasePrice: Double
@@ -22,13 +28,17 @@ struct PropertyInvestment: Codable, Identifiable {
     var mortgageId: UUID? // Reference to the mortgage account if financed
     var rentalTransactions: [RentalTransaction] = []
     
+    // Property location (for tax purposes)
+    private var _location: PropertyLocation? = .suburban
+    
     // Initialize a new property investment
-    init(collateralId: UUID, purchasePrice: Double, purchaseYear: Int, mortgageId: UUID? = nil) {
+    init(collateralId: UUID, purchasePrice: Double, purchaseYear: Int, mortgageId: UUID? = nil, location: PropertyLocation = .suburban) {
         self.collateralId = collateralId
         self.purchasePrice = purchasePrice
         self.currentValue = purchasePrice
         self.purchaseYear = purchaseYear
         self.mortgageId = mortgageId
+        self._location = location
     }
     
     // Set up as a rental property

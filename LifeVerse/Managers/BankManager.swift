@@ -16,9 +16,17 @@ class BankManager: ObservableObject, Codable {
     @Published var overdraftProtection: Bool = false // Whether overdraft protection is enabled
     @Published var creditReportRequests: Int = 0 // Number of credit report requests (affects score)
     
+    // Taxation and income-based loan qualification properties
+    @Published var taxationSystem: TaxationSystem = TaxationSystem()
+    @Published var annualIncome: Double = 50000 // Default annual income
+    @Published var employmentStatus: EmploymentStatus = .employed // Default employment status
+    @Published var employmentHistory: [EmploymentRecord] = [] // Employment history for loan qualification
+    @Published var taxPaymentHistory: [TaxPayment] = [] // History of tax payments
+    
     // Coding keys for Codable conformance
     enum CodingKeys: String, CodingKey {
         case accounts, creditScore, collateralAssets, propertyInvestments, marketCondition, transactionHistory, overdraftProtection, creditReportRequests
+        case taxationSystem, annualIncome, employmentStatus, employmentHistory, taxPaymentHistory
     }
     
     // Required for Codable when using @Published
@@ -34,6 +42,13 @@ class BankManager: ObservableObject, Codable {
         transactionHistory = try container.decodeIfPresent([BankTransaction].self, forKey: .transactionHistory) ?? []
         overdraftProtection = try container.decodeIfPresent(Bool.self, forKey: .overdraftProtection) ?? false
         creditReportRequests = try container.decodeIfPresent(Int.self, forKey: .creditReportRequests) ?? 0
+        
+        // Decode taxation and income-based loan qualification properties with backward compatibility
+        taxationSystem = try container.decodeIfPresent(TaxationSystem.self, forKey: .taxationSystem) ?? TaxationSystem()
+        annualIncome = try container.decodeIfPresent(Double.self, forKey: .annualIncome) ?? 50000
+        employmentStatus = try container.decodeIfPresent(EmploymentStatus.self, forKey: .employmentStatus) ?? .employed
+        employmentHistory = try container.decodeIfPresent([EmploymentRecord].self, forKey: .employmentHistory) ?? []
+        taxPaymentHistory = try container.decodeIfPresent([TaxPayment].self, forKey: .taxPaymentHistory) ?? []
     }
     
     // Encode for Codable
@@ -47,6 +62,13 @@ class BankManager: ObservableObject, Codable {
         try container.encode(transactionHistory, forKey: .transactionHistory)
         try container.encode(overdraftProtection, forKey: .overdraftProtection)
         try container.encode(creditReportRequests, forKey: .creditReportRequests)
+        
+        // Encode taxation and income-based loan qualification properties
+        try container.encode(taxationSystem, forKey: .taxationSystem)
+        try container.encode(annualIncome, forKey: .annualIncome)
+        try container.encode(employmentStatus, forKey: .employmentStatus)
+        try container.encode(employmentHistory, forKey: .employmentHistory)
+        try container.encode(taxPaymentHistory, forKey: .taxPaymentHistory)
     }
     
     // Default initializer
@@ -290,6 +312,33 @@ class BankManager: ObservableObject, Codable {
         var events: [LifeEvent] = []
         var totalInterest: Double = 0
         var totalFees: Double = 0
+        
+        // Process taxes
+        let taxes = processYearlyTaxes(currentYear: currentYear)
+        let totalTaxes = taxes.incomeTax + taxes.propertyTax + taxes.capitalGainsTax + taxes.interestTax
+        
+        // Create tax event if taxes are significant
+        if totalTaxes > 1000 {
+            let taxEvent = LifeEvent(
+                title: "Tax Payment Due",
+                description: "You owe $\(Int(totalTaxes).formattedWithSeparator()) in taxes for the year \(currentYear).",
+                type: .financial,
+                year: currentYear,
+                choices: [
+                    EventChoice(
+                        text: "Pay taxes",
+                        outcome: "You paid $\(Int(totalTaxes).formattedWithSeparator()) in taxes.",
+                        effects: [EventChoice.CharacterEffect(attribute: "money", change: -Int(totalTaxes))]
+                    ),
+                    EventChoice(
+                        text: "Delay payment (may incur penalties)",
+                        outcome: "You delayed your tax payment. This may affect your credit score and incur penalties.",
+                        effects: [EventChoice.CharacterEffect(attribute: "creditScore", change: -10)]
+                    )
+                ]
+            )
+            events.append(taxEvent)
+        }
         
         // Update market conditions
         updateMarketConditions()
