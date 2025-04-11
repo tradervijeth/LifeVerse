@@ -161,23 +161,27 @@ class GameManager: ObservableObject {
         let motherName = femaleNames.randomElement() ?? "Anne"
         let motherAge = Int.random(in: 25...40)
         let motherBirthYear = character.birthYear - motherAge
-        let mother = Relationship(
+        var mother = Relationship(
             name: motherName,
             type: .parent,
             closeness: Int.random(in: 50...95),
             years: character.age
         )
+        mother.generateRandomTraits(characterIntelligence: character.intelligence)
+        mother.initializeEnhancedProperties(currentYear: currentYear)
 
         // Create father
         let fatherName = maleNames.randomElement() ?? "John"
         let fatherAge = Int.random(in: 25...45)
         let fatherBirthYear = character.birthYear - fatherAge
-        let father = Relationship(
+        var father = Relationship(
             name: fatherName,
             type: .parent,
             closeness: Int.random(in: 40...95),
             years: character.age
         )
+        father.generateRandomTraits(characterIntelligence: character.intelligence)
+        father.initializeEnhancedProperties(currentYear: currentYear)
 
         // Add parents to relationships
         character.relationships.append(mother)
@@ -196,12 +200,14 @@ class GameManager: ObservableObject {
 
                 // Only add if the sibling would be born after the parents
                 if siblingBirthYear > motherBirthYear + 16 && siblingBirthYear > fatherBirthYear + 16 {
-                    let sibling = Relationship(
+                    var sibling = Relationship(
                         name: siblingName,
                         type: .sibling,
                         closeness: Int.random(in: 40...90),
                         years: min(character.age, currentYear - siblingBirthYear)
                     )
+                    sibling.generateRandomTraits(characterIntelligence: character.intelligence)
+                    sibling.initializeEnhancedProperties(currentYear: currentYear)
                     character.relationships.append(sibling)
                 }
             }
@@ -532,7 +538,7 @@ class GameManager: ObservableObject {
                 let name = character.relationships[i].name
                 let type = character.relationships[i].type
                 let endingEvent = LifeEvent(
-                    title: type == .significantOther || type == .spouse ? "Breakup" : "Relationship Ended",
+                    title: type == .romantic || type == .spouse ? "Breakup" : "Relationship Ended",
                     description: "Your relationship with \(name) came to an end.",
                     type: .relationship,
                     year: currentYear,
@@ -554,7 +560,7 @@ class GameManager: ObservableObject {
         character.relationships.removeAll { relationshipsToRemove.contains($0.id) }
 
         // Check for relationship milestone events
-        for relationship in character.relationships where relationship.type == .significantOther || relationship.type == .spouse {
+        for relationship in character.relationships where relationship.type == .romantic || relationship.type == .spouse {
             if let milestoneEvent = RelationshipEvents.generateRelationshipMilestoneEvent(for: character, relationship: relationship) {
                 currentEvents.append(milestoneEvent)
                 character.lifeEvents.append(milestoneEvent)
@@ -564,6 +570,32 @@ class GameManager: ObservableObject {
             if let weddingEvent = RelationshipEvents.generateWeddingEvent(for: character, relationship: relationship) {
                 currentEvents.append(weddingEvent)
                 character.lifeEvents.append(weddingEvent)
+            }
+
+            // US-specific relationship events
+
+            // Marriage proposal with US rules
+            if let proposalEvent = USRelationshipEvents.generateMarriageProposalEvent(for: character, relationship: relationship) {
+                currentEvents.append(proposalEvent)
+                character.lifeEvents.append(proposalEvent)
+            }
+
+            // Wedding planning with US options
+            if let weddingPlanningEvent = USRelationshipEvents.generateWeddingPlanningEvent(for: character, relationship: relationship) {
+                currentEvents.append(weddingPlanningEvent)
+                character.lifeEvents.append(weddingPlanningEvent)
+            }
+
+            // Prenuptial agreement (US legal concept)
+            if let prenupEvent = USRelationshipEvents.generatePrenuptialAgreementEvent(for: character, relationship: relationship) {
+                currentEvents.append(prenupEvent)
+                character.lifeEvents.append(prenupEvent)
+            }
+
+            // Divorce with US rules
+            if let divorceEvent = USRelationshipEvents.generateDivorceEvent(for: character, relationship: relationship) {
+                currentEvents.append(divorceEvent)
+                character.lifeEvents.append(divorceEvent)
             }
         }
 
@@ -967,23 +999,27 @@ class GameManager: ObservableObject {
                 // Create a romantic relationship
                 let names = ["Alex", "Jordan", "Taylor", "Morgan", "Riley", "Avery", "Casey", "Quinn"]
                 let randomName = names.randomElement() ?? "Sam"
-                let newRelationship = Relationship(
+                var newRelationship = Relationship(
                     name: randomName,
-                    type: .significantOther,
+                    type: .romantic,
                     closeness: 60,
                     years: 0
                 )
+                newRelationship.generateRandomTraits(characterIntelligence: character.intelligence)
+                newRelationship.initializeEnhancedProperties(currentYear: currentYear)
                 character.relationships.append(newRelationship)
             } else if event.title == "Potential Friendship" && choice.text.contains("Make friends") {
                 // Create a friendship
                 let names = ["Jamie", "Pat", "Chris", "Reese", "Drew", "Skyler", "Blake", "Frankie"]
                 let randomName = names.randomElement() ?? "Robin"
-                let newRelationship = Relationship(
+                var newRelationship = Relationship(
                     name: randomName,
                     type: .friend,
                     closeness: 50,
                     years: 0
                 )
+                newRelationship.generateRandomTraits(characterIntelligence: character.intelligence)
+                newRelationship.initializeEnhancedProperties(currentYear: currentYear)
                 character.relationships.append(newRelationship)
             }
         }
@@ -1126,7 +1162,7 @@ class GameManager: ObservableObject {
         var possibleCareers: [Career] = []
 
         // Get salary range based on education
-        let (minSalary, maxSalary) = salaryRangeForEducation(character.education)
+        _ = salaryRangeForEducation(character.education) // Salary range will be used per job
 
         // Generate 1-3 random job offerings
         let jobCount = Int.random(in: 1...3)
@@ -1196,38 +1232,20 @@ class GameManager: ObservableObject {
                 preferredIndustries.randomElement() ?? Industry.allCases.randomElement()! :
                 Industry.allCases.randomElement()!
 
-            // Calculate salary
-            let baseSalary = Double.random(in: minSalary...maxSalary)
-            let salary: Double
-
-            // Adjust salary based on career level
-            switch level {
-            case .entry:
-                salary = baseSalary * 1.0
-            case .junior:
-                salary = baseSalary * 1.2
-            case .mid:
-                salary = baseSalary * 1.5
-            case .senior:
-                salary = baseSalary * 2.0
-            case .lead:
-                salary = baseSalary * 2.5
-            case .manager:
-                salary = baseSalary * 3.0
-            case .director:
-                salary = baseSalary * 4.0
-            case .executive:
-                salary = baseSalary * 5.0
-            case .cLevel:
-                salary = baseSalary * 7.0
-            }
-
             // Determine job title and specialization requirements
             let (title, fieldRequirement, specializationRequirement) = generateJobDetails(
                 industry: industry,
                 level: level,
                 degreeField: character.degreeField,
                 education: character.education
+            )
+
+            // Calculate realistic salary based on US data
+            let salary = USSalaryData.calculateRealisticSalary(
+                jobTitle: title,
+                industry: industry,
+                education: character.education,
+                level: level
             )
 
             // Years required for promotion based on level
@@ -1324,22 +1342,9 @@ class GameManager: ObservableObject {
         self.character = character
     }
 
-    // Helper to determine salary range based on education
+    // Helper to determine salary range based on education using realistic US data
     private func salaryRangeForEducation(_ education: Education) -> (Double, Double) {
-        switch education {
-        case .none, .elementarySchool, .middleSchool:
-            return (20000, 30000)
-        case .highSchool:
-            return (25000, 45000)
-        case .associatesDegree:
-            return (35000, 60000)
-        case .bachelorsDegree:
-            return (50000, 90000)
-        case .mastersDegree:
-            return (70000, 120000)
-        case .doctoralDegree:
-            return (90000, 180000)
-        }
+        return USSalaryData.getSalaryRangeForEducation(education)
     }
 
     // Creates and adds a new event
@@ -1668,6 +1673,7 @@ class GameManager: ObservableObject {
                 years: Int.random(in: 1...4)  // Known for 1-4 years
             )
             newFriend.generateRandomTraits(characterIntelligence: character.intelligence)
+            newFriend.initializeEnhancedProperties(currentYear: currentYear)
             character.relationships.append(newFriend)
         }
 
@@ -1680,11 +1686,12 @@ class GameManager: ObservableObject {
 
             var partner = Relationship(
                 name: partnerName,
-                type: .significantOther,
+                type: .romantic,
                 closeness: Int.random(in: 70...90),
                 years: Int.random(in: 0...1)  // Dating for up to 1 year
             )
             partner.generateRandomTraits(characterIntelligence: character.intelligence)
+            partner.initializeEnhancedProperties(currentYear: currentYear)
             character.relationships.append(partner)
         }
     }
@@ -2028,7 +2035,7 @@ class GameManager: ObservableObject {
 
     // Enum for relationship interaction types
     enum RelationshipInteraction {
-        case spendTime, gift, romance, resolveIssue
+        case spendTime, gift, romance, resolveIssue, deepTalk, argue, moveIn, propose, planWedding, breakUp
     }
 
     // Interact with a relationship at a specific index
@@ -2102,7 +2109,7 @@ class GameManager: ObservableObject {
             description = "You planned a special evening with \(relationship.name)."
 
             // Romance only applies to significant others and spouses
-            if relationship.type != .significantOther && relationship.type != .spouse {
+            if relationship.type != .romantic && relationship.type != .spouse {
                 outcome = "This type of interaction isn't appropriate for your relationship with \(relationship.name)."
                 closenessChange = -5
                 happinessChange = -5
@@ -2157,6 +2164,55 @@ class GameManager: ObservableObject {
                 closenessChange = 3
                 happinessChange = 3
             }
+        case .deepTalk:
+            title = "Deep Conversation"
+            description = "You had a meaningful conversation with \(relationship.name)."
+
+            let topics = ["life goals", "childhood memories", "hopes and dreams", "philosophical questions", "personal values"]
+            let topic = topics.randomElement()!
+
+            // Base values
+            let baseCloseness = Int.random(in: 7...15)
+            let baseHappiness = Int.random(in: 4...10)
+
+            // Adjust for relationship mood
+            let moodFactor = 1.0 + (Double(relationship.moodModifier) / 20.0)
+            closenessChange = Int(Double(baseCloseness) * moodFactor)
+            happinessChange = Int(Double(baseHappiness) * moodFactor)
+
+            outcome = "You talked about \(topic) and shared your thoughts and feelings. The conversation deepened your understanding of each other."
+
+        case .argue:
+            title = "Argument"
+            description = "You had an argument with \(relationship.name)."
+
+            let topics = ["a misunderstanding", "different opinions", "something they said", "something you said", "a sensitive topic"]
+            let topic = topics.randomElement()!
+
+            // Base values (negative for arguments)
+            let baseCloseness = -Int.random(in: 5...15)
+            let baseHappiness = -Int.random(in: 5...10)
+
+            // Adjust for relationship mood
+            let moodFactor = 1.0 + (Double(relationship.moodModifier) / 20.0)
+            closenessChange = Int(Double(baseCloseness) * moodFactor)
+            happinessChange = Int(Double(baseHappiness) * moodFactor)
+
+            outcome = "You argued about \(topic). The disagreement has strained your relationship."
+
+            // Chance to create a relationship issue
+            if Int.random(in: 1...100) <= 30 { // 30% chance
+                let issue = Relationship.RelationshipIssue(
+                    type: .communication, // Using a default type
+                    severity: Int.random(in: 1...5),
+                    yearStarted: currentYear
+                )
+                relationship.issues.append(issue)
+            }
+
+        case .moveIn, .propose, .planWedding, .breakUp:
+            // These are handled by the RelationshipManager
+            return
         }
 
         // Update relationship and character
@@ -2264,18 +2320,22 @@ class GameManager: ObservableObject {
             )
             // Generate random traits for the new friend
             newRelationship.generateRandomTraits(characterIntelligence: character.intelligence)
+            // Initialize enhanced properties
+            newRelationship.initializeEnhancedProperties(currentYear: currentYear)
             character.relationships.append(newRelationship)
         }
         else if attributeString.starts(with: "new_significant_other_") {
             let name = attributeString.replacingOccurrences(of: "new_significant_other_", with: "")
             var newRelationship = Relationship(
                 name: name,
-                type: .significantOther,
+                type: .romantic,
                 closeness: 70,
                 years: 0
             )
             // Generate random traits
             newRelationship.generateRandomTraits(characterIntelligence: character.intelligence)
+            // Initialize enhanced properties
+            newRelationship.initializeEnhancedProperties(currentYear: currentYear)
             character.relationships.append(newRelationship)
         }
         else if attributeString.starts(with: "new_coworker_") {
@@ -2288,6 +2348,8 @@ class GameManager: ObservableObject {
             )
             // Generate random traits
             newRelationship.generateRandomTraits(characterIntelligence: character.intelligence)
+            // Initialize enhanced properties
+            newRelationship.initializeEnhancedProperties(currentYear: currentYear)
             character.relationships.append(newRelationship)
         }
         // Relationship status changes
@@ -2341,7 +2403,7 @@ class GameManager: ObservableObject {
                 }
 
                 // If it was significant other, clean up any engagement status
-                if relationship?.type == .significantOther {
+                if relationship?.type == .romantic {
                     character.setMetadataValue("", forKey: "relationship_engaged_\(uuid.uuidString)")
                 }
             }
