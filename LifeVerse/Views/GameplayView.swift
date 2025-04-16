@@ -12,10 +12,12 @@ struct GameplayView: View {
     @State private var selectedTab: String = "Events"
     @State private var showActionSheet: Bool = false
     @State private var showJobOffers: Bool = false
+    @State private var showBankingView: Bool = false
+    @State private var showPropertyView: Bool = false
     @State private var jobOffers: [Career] = []
-    
+
     var tabs = ["Events", "Career", "Assets", "Relationships"]
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Character info header
@@ -23,7 +25,7 @@ struct GameplayView: View {
                 CharacterInfoHeader(character: character, currentYear: gameManager.currentYear)
                     .padding(.top)
             }
-            
+
             // Tab selector
             HStack {
                 ForEach(tabs, id: \.self) { tab in
@@ -42,7 +44,7 @@ struct GameplayView: View {
             }
             .padding()
             .background(Color(UIColor.tertiarySystemBackground))
-            
+
             // Content based on selected tab
             ScrollView {
                 VStack(spacing: 15) {
@@ -62,7 +64,7 @@ struct GameplayView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 80) // Space for button
             }
-            
+
             // Footer with action buttons
             HStack(spacing: 20) {
                 // Actions button
@@ -77,9 +79,9 @@ struct GameplayView: View {
                     }
                     .foregroundColor(.blue)
                 }
-                
+
                 Spacer()
-                
+
                 // Age up button
                 Button(action: {
                     showAgeUpSheet = true
@@ -92,9 +94,9 @@ struct GameplayView: View {
                     }
                     .foregroundColor(.green)
                 }
-                
+
                 Spacer()
-                
+
                 // Stats button
                 Button(action: {
                     // Could show detailed stats here
@@ -121,6 +123,12 @@ struct GameplayView: View {
                     showJobOffers = false
                 })
             }
+        }
+        .sheet(isPresented: $showBankingView) {
+            BankingView(gameManager: gameManager)
+        }
+        .sheet(isPresented: $showPropertyView) {
+            PropertyInvestmentView(gameManager: gameManager)
         }
         .actionSheet(isPresented: $showActionSheet) {
             ActionSheet(
@@ -150,14 +158,18 @@ struct GameplayView: View {
                             }
                         }
                     },
+                    .default(Text("Banking & Investments")) {
+                        // Show banking view
+                        showBankingView = true
+                    },
                     .cancel()
                 ]
             )
         }
     }
-    
+
     // MARK: - Tab Views
-    
+
     var eventsView: some View {
         VStack(alignment: .leading, spacing: 15) {
             if gameManager.currentEvents.isEmpty {
@@ -168,24 +180,24 @@ struct GameplayView: View {
             } else {
                 Text("Recent Events")
                     .font(.headline)
-                
+
                 ForEach(gameManager.currentEvents, id: \.id) { event in
                     EventCard(event: event, makeChoice: { choice in
                         gameManager.makeChoice(for: event, choice: choice)
                     })
                 }
             }
-            
+
             Divider()
-            
+
             Text("Life Timeline")
                 .font(.headline)
-            
+
             if let character = gameManager.character {
                 ForEach(character.lifeEvents.prefix(10).reversed(), id: \.id) { event in
                     TimelineEventRow(event: event, birthYear: character.birthYear)
                 }
-                
+
                 if character.lifeEvents.count > 10 {
                     Text("+ \(character.lifeEvents.count - 10) more events...")
                         .font(.caption)
@@ -194,7 +206,7 @@ struct GameplayView: View {
             }
         }
     }
-    
+
     var careerView: some View {
         VStack(alignment: .leading, spacing: 15) {
             if let character = gameManager.character, let career = character.career {
@@ -205,7 +217,7 @@ struct GameplayView: View {
                         Text("Current Career")
                             .font(.headline)
                     }
-                    
+
                     HStack {
                         VStack(alignment: .leading) {
                             Text(career.title)
@@ -214,9 +226,9 @@ struct GameplayView: View {
                             Text(career.company)
                                 .font(.subheadline)
                         }
-                        
+
                         Spacer()
-                        
+
                         VStack(alignment: .trailing) {
                             Text("$\(Int(career.salary).formattedWithSeparator())/yr")
                                 .font(.headline)
@@ -227,11 +239,11 @@ struct GameplayView: View {
                     .padding()
                     .background(Color(UIColor.secondarySystemBackground))
                     .cornerRadius(10)
-                    
+
                     HStack {
                         Text("Performance:")
                             .font(.subheadline)
-                        
+
                         PerformanceMeter(value: career.performanceRating)
                     }
                     .padding(.top, 5)
@@ -241,10 +253,10 @@ struct GameplayView: View {
                     Image(systemName: "briefcase")
                         .font(.largeTitle)
                         .foregroundColor(.secondary)
-                    
+
                     Text("No current job")
                         .font(.headline)
-                    
+
                     Text("You're unemployed. Use the Actions button to look for job opportunities.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
@@ -257,10 +269,10 @@ struct GameplayView: View {
                     Image(systemName: "graduationcap")
                         .font(.largeTitle)
                         .foregroundColor(.secondary)
-                    
+
                     Text("Too young to work")
                         .font(.headline)
-                    
+
                     Text("You need to be at least 18 years old to start a career.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
@@ -271,7 +283,7 @@ struct GameplayView: View {
             }
         }
     }
-    
+
     var assetsView: some View {
         VStack(alignment: .leading, spacing: 15) {
             if let character = gameManager.character {
@@ -281,7 +293,7 @@ struct GameplayView: View {
                     Text("Finances")
                         .font(.headline)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Text("Cash:")
@@ -290,9 +302,41 @@ struct GameplayView: View {
                         Text("$\(Int(character.money).formattedWithSeparator())")
                             .fontWeight(.medium)
                     }
-                    
+
+                    // Banking & Investments buttons
+                    HStack(spacing: 10) {
+                        Button(action: {
+                            showBankingView = true
+                        }) {
+                            HStack {
+                                Image(systemName: "building.columns")
+                                Text("Banking")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+
+                        Button(action: {
+                            showPropertyView = true
+                        }) {
+                            HStack {
+                                Image(systemName: "house")
+                                Text("Properties")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                    }
+                    .padding(.vertical, 5)
+
                     Divider()
-                    
+
                     HStack {
                         Text("Assets")
                             .font(.headline)
@@ -301,7 +345,7 @@ struct GameplayView: View {
                             .font(.subheadline)
                     }
                     .padding(.top, 5)
-                    
+
                     if character.possessions.isEmpty {
                         Text("No assets owned")
                             .foregroundColor(.secondary)
@@ -317,12 +361,12 @@ struct GameplayView: View {
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
-                                
+
                                 Spacer()
-                                
+
                                 VStack(alignment: .trailing) {
                                     Text("$\(Int(possession.value).formattedWithSeparator())")
-                                    
+
                                     // Condition indicator
                                     HStack(spacing: 1) {
                                         ForEach(0..<5) { index in
@@ -337,7 +381,7 @@ struct GameplayView: View {
                                 }
                             }
                             .padding(.vertical, 5)
-                            
+
                             // Fixed comparison to use id
                             if possession.id != character.possessions.last?.id {
                                 Divider()
@@ -348,7 +392,7 @@ struct GameplayView: View {
                 .padding()
                 .background(Color(UIColor.secondarySystemBackground))
                 .cornerRadius(10)
-                
+
                 if character.age < 18 {
                     Text("Note: You're under 18, so you can't purchase a car or other major assets yet.")
                         .font(.caption)
@@ -358,7 +402,7 @@ struct GameplayView: View {
             }
         }
     }
-    
+
     var relationshipsView: some View {
         VStack(alignment: .leading, spacing: 15) {
             if let character = gameManager.character {
@@ -368,16 +412,16 @@ struct GameplayView: View {
                     Text("Relationships")
                         .font(.headline)
                 }
-                
+
                 if character.relationships.isEmpty {
                     VStack(spacing: 10) {
                         Image(systemName: "person.fill.questionmark")
                             .font(.largeTitle)
                             .foregroundColor(.secondary)
-                        
+
                         Text("No relationships yet")
                             .font(.headline)
-                        
+
                         Text("You'll encounter people as you age up and can form relationships.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
@@ -393,9 +437,9 @@ struct GameplayView: View {
             }
         }
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func calculateNetWorth(_ character: Character) -> Int {
         let assetsValue = character.possessions.reduce(0) { $0 + $1.value }
         return Int(character.money + assetsValue)
@@ -407,7 +451,7 @@ struct GameplayView: View {
 struct TimelineEventRow: View {
     let event: LifeEvent
     let birthYear: Int
-    
+
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             // Age indicator
@@ -418,17 +462,17 @@ struct TimelineEventRow: View {
                     .background(Circle().fill(Color.blue.opacity(0.2)))
             }
             .frame(width: 30)
-            
+
             // Event content
             VStack(alignment: .leading, spacing: 3) {
                 Text(event.title)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                
+
                 Text(event.description)
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
+
                 if let outcome = event.outcome {
                     Text(outcome)
                         .font(.caption)
@@ -443,7 +487,7 @@ struct TimelineEventRow: View {
 
 struct PerformanceMeter: View {
     let value: Int
-    
+
     var body: some View {
         HStack(spacing: 2) {
             ForEach(0..<5) { index in
@@ -456,7 +500,7 @@ struct PerformanceMeter: View {
             }
         }
     }
-    
+
     private func colorForIndex(index: Int, value: Int) -> Color {
         let threshold = index * 20
         if value > threshold {
@@ -476,7 +520,7 @@ struct PerformanceMeter: View {
 
 struct RelationshipRow: View {
     let relationship: Relationship
-    
+
     var emoji: String {
         switch relationship.type {
         case .parent: return "👨‍👦"
@@ -489,28 +533,28 @@ struct RelationshipRow: View {
         case .coworker: return "👔"
         }
     }
-    
+
     var body: some View {
         HStack {
             Text(emoji)
                 .font(.title2)
                 .frame(width: 40)
-            
+
             VStack(alignment: .leading) {
                 Text(relationship.name)
                     .fontWeight(.medium)
-                
+
                 Text(relationship.type.rawValue.capitalized)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             VStack(alignment: .trailing) {
                 Text("\(relationship.years) years")
                     .font(.caption)
-                
+
                 // Closeness indicator
                 HStack(spacing: 1) {
                     ForEach(0..<5) { index in
@@ -535,7 +579,7 @@ struct JobOffersView: View {
     let careers: [Career]
     let onAccept: (Career) -> Void
     @Environment(\.presentationMode) var presentationMode
-    
+
     var body: some View {
         NavigationView {
             List {
@@ -543,15 +587,15 @@ struct JobOffersView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Text("\(career.title)")
                             .font(.headline)
-                        
+
                         Text("at \(career.company)")
                             .font(.subheadline)
-                        
+
                         Text("Salary: $\(Int(career.salary).formattedWithSeparator())/year")
                             .font(.body)
                             .foregroundColor(.green)
                             .padding(.top, 2)
-                        
+
                         Button(action: {
                             onAccept(career)
                         }) {
