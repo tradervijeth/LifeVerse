@@ -12,7 +12,7 @@ struct AgeUpView: View {
     @State private var animationProgress = 0.0
     @State private var showSummary = false
     @State private var yearSummary: YearSummary?
-    
+
     var body: some View {
         VStack {
             if showSummary, let summary = yearSummary {
@@ -27,26 +27,26 @@ struct AgeUpView: View {
             startAgeUpAnimation()
         }
     }
-    
+
     var ageUpProgressView: some View {
         VStack(spacing: 30) {
             Text("Getting Older...")
                 .font(.title)
                 .fontWeight(.bold)
-            
+
             if let character = gameManager.character {
                 Text("\(character.age) → \(character.age + 1)")
                     .font(.system(size: 36, weight: .bold))
                     .foregroundColor(.blue)
             }
-            
+
             // Progress animation
             ZStack(alignment: .leading) {
                 Rectangle()
                     .frame(height: 12)
                     .foregroundColor(.gray.opacity(0.3))
                     .cornerRadius(6)
-                
+
                 Rectangle()
                     .frame(width: CGFloat(animationProgress) * 300, height: 12)
                     .foregroundColor(.green)
@@ -56,17 +56,17 @@ struct AgeUpView: View {
         }
         .padding()
     }
-    
+
     func yearSummaryView(_ summary: YearSummary) -> some View {
         VStack(spacing: 20) {
             Text("Year in Review")
                 .font(.title)
                 .fontWeight(.bold)
-            
+
             Text("Age \(summary.age)")
                 .font(.title2)
                 .foregroundColor(.secondary)
-            
+
             VStack(alignment: .leading, spacing: 15) {
                 if let career = summary.career {
                     HStack {
@@ -75,13 +75,13 @@ struct AgeUpView: View {
                         Text("Career")
                             .font(.headline)
                     }
-                    
+
                     VStack(alignment: .leading, spacing: 5) {
                         Text("\(career.title) at \(career.company)")
                             .font(.subheadline)
                         Text("Salary: $\(Int(career.salary).formattedWithSeparator())")
                             .font(.subheadline)
-                        
+
                         if summary.incomeAdded > 0 {
                             Text("Added $\(Int(summary.incomeAdded).formattedWithSeparator()) to your account")
                                 .foregroundColor(.green)
@@ -91,16 +91,16 @@ struct AgeUpView: View {
                     }
                     .padding(.leading)
                 }
-                
+
                 Divider()
-                
+
                 HStack {
                     Image(systemName: "chart.line.uptrend.xyaxis")
                         .foregroundColor(.purple)
                     Text("Stats Changes")
                         .font(.headline)
                 }
-                
+
                 ForEach(summary.statChanges, id: \.attribute) { change in
                     HStack {
                         Text(change.attribute.capitalized)
@@ -111,22 +111,22 @@ struct AgeUpView: View {
                     }
                     .padding(.horizontal)
                 }
-                
+
                 Divider()
-                
+
                 HStack {
                     Image(systemName: "calendar")
                         .foregroundColor(.orange)
                     Text("Events")
                         .font(.headline)
                 }
-                
+
                 ForEach(summary.events, id: \.id) { event in
                     VStack(alignment: .leading, spacing: 3) {
                         Text(event.title)
                             .font(.subheadline)
                             .fontWeight(.medium)
-                        
+
                         if let outcome = event.outcome {
                             Text(outcome)
                                 .font(.caption)
@@ -141,7 +141,7 @@ struct AgeUpView: View {
             .background(Color(UIColor.secondarySystemBackground))
             .cornerRadius(12)
             .padding(.horizontal)
-            
+
             Button(action: {
                 isPresented = false
             }) {
@@ -157,13 +157,13 @@ struct AgeUpView: View {
         }
         .padding()
     }
-    
+
     private func startAgeUpAnimation() {
         // Animate the progress bar
         withAnimation(.linear(duration: 1.5)) {
             animationProgress = 1.0
         }
-        
+
         // After animation completes, advance the year and show summary
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
             // Capture state before advancing
@@ -173,16 +173,16 @@ struct AgeUpView: View {
             let beforeLooks = gameManager.character?.looks ?? 0
             let beforeAthleticism = gameManager.character?.athleticism ?? 0
             let beforeMoney = gameManager.character?.money ?? 0
-            
+
             // Progress the game
             gameManager.advanceYear()
-            
+
             // If the character died, close the sheet
             if gameManager.gameEnded {
                 isPresented = false
                 return
             }
-            
+
             // Create year summary
             if let character = gameManager.character {
                 // Calculate stat changes
@@ -202,17 +202,17 @@ struct AgeUpView: View {
                 if character.athleticism != beforeAthleticism {
                     statChanges.append(StatChange(attribute: "athleticism", change: character.athleticism - beforeAthleticism))
                 }
-                
+
                 // Calculate income added (excluding effects from events to avoid double counting)
                 var incomeAdded: Double = 0
-                if let career = character.career {
+                if character.career != nil {
                     incomeAdded = character.money - beforeMoney
                     // If money decreased, don't show negative income (that would be from events)
                     if incomeAdded < 0 {
                         incomeAdded = 0
                     }
                 }
-                
+
                 yearSummary = YearSummary(
                     age: character.age,
                     career: character.career,
@@ -220,7 +220,7 @@ struct AgeUpView: View {
                     events: gameManager.currentEvents,
                     incomeAdded: incomeAdded
                 )
-                
+
                 showSummary = true
             }
         }

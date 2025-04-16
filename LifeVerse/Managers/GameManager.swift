@@ -13,15 +13,16 @@ class GameManager: ObservableObject {
     @Published var gameStarted: Bool = false
     @Published var gameEnded: Bool = false
     @Published var currentEvents: [LifeEvent] = []
-    
+    @Published var bankManager = BankManager()
+
     private let contentManager = ContentManager()
-    
+
     func startNewGame(name: String, birthYear: Int, gender: Gender) {
         character = Character(name: name, birthYear: birthYear, gender: gender)
         currentYear = birthYear
         gameStarted = true
         gameEnded = false
-        
+
         // Add birth event
         let birthEvent = LifeEvent(
             title: "Birth",
@@ -29,30 +30,30 @@ class GameManager: ObservableObject {
             type: .birth,
             year: birthYear
         )
-        
+
         character?.lifeEvents.append(birthEvent)
         currentEvents = [birthEvent]
     }
-    
+
     func advanceYear() {
         guard var character = character, character.isAlive else {
             gameEnded = true
             return
         }
-        
+
         // Handle yearly income if character has a job
         if let career = character.career, character.age >= 18 {
             // Add yearly salary to character's money
             character.money += career.salary
-            
+
             // Increment years at job
             character.career?.yearsAtJob += 1
-            
+
             // Randomly update performance
             let performanceChange = Int.random(in: -5...10)
             character.career?.performanceRating = max(0, min(100, career.performanceRating + performanceChange))
         }
-        
+
         // Age-related expenses (only for adults)
         if character.age >= 18 {
             // Basic living expenses based on residence type
@@ -69,10 +70,10 @@ class GameManager: ObservableObject {
             case .homeless:
                 livingExpenses = 2400 // $200/month minimal expenses
             }
-            
+
             // Deduct living expenses
             character.money -= livingExpenses
-            
+
             // Create living expense event
             let expenseEvent = LifeEvent(
                 title: "Living Expenses",
@@ -83,19 +84,19 @@ class GameManager: ObservableObject {
                 effects: [EventChoice.CharacterEffect(attribute: "money", change: -Int(livingExpenses))]
             )
             character.lifeEvents.append(expenseEvent)
-            
+
             // Car expenses for those who own cars (only if 18+)
             if let carIndex = character.possessions.firstIndex(where: { $0.name.lowercased().contains("car") }) {
                 let car = character.possessions[carIndex]
-                
+
                 // Car maintenance and insurance costs (roughly 10% of car value per year)
                 let carExpenses = car.value * 0.1
                 character.money -= carExpenses
-                
+
                 // Decrease car condition
                 let newCondition = max(0, car.condition - Int.random(in: 5...15))
                 character.possessions[carIndex].condition = newCondition
-                
+
                 // Create car expense event
                 let carEvent = LifeEvent(
                     title: "Car Expenses",
@@ -108,17 +109,17 @@ class GameManager: ObservableObject {
                 character.lifeEvents.append(carEvent)
             }
         }
-        
+
         currentYear += 1
         let newEvents = character.ageUp()
-        
+
         // Process automatic events
         for event in newEvents {
             if event.choices == nil && event.effects != nil {
                 applyEventEffects(event.effects!, to: &character)
             }
         }
-        
+
         // Child-specific restrictions
         if character.age < 18 {
             // Enforce that minors can't have certain possessions
@@ -126,11 +127,11 @@ class GameManager: ObservableObject {
                 let name = possession.name.lowercased()
                 return name.contains("car") || name.contains("house") || name.contains("apartment")
             }
-            
+
             // Enforce appropriate residence
             character.residence = .parentsHome
         }
-        
+
         // Check for bankruptcy
         if character.money < -10000 {
             // Create bankruptcy event
@@ -160,25 +161,25 @@ class GameManager: ObservableObject {
             currentEvents.append(bankruptcyEvent)
             character.lifeEvents.append(bankruptcyEvent)
         }
-        
+
         self.character = character
-        
+
         // Add the new events to the current events list
         // (We'll prepend the automatic events we generated for expenses)
-        let autoEvents = character.lifeEvents.filter { event in 
-            return event.year == currentYear && 
+        let autoEvents = character.lifeEvents.filter { event in
+            return event.year == currentYear &&
                    !newEvents.contains { $0.id == event.id }
         }
         currentEvents = autoEvents + newEvents
-        
+
         if !character.isAlive {
             gameEnded = true
         }
-        
+
         // Auto-save the game after each year
         _ = SaveSystem.saveGame(gameManager: self)
     }
-    
+
     private func applyEventEffects(_ effects: [EventChoice.CharacterEffect], to character: inout Character) {
         for effect in effects {
             switch effect.attribute {
@@ -199,11 +200,11 @@ class GameManager: ObservableObject {
             }
         }
     }
-    
+
     func makeChoice(for event: LifeEvent, choice: EventChoice) {
         // Apply effects of the choice to the character
         guard var character = self.character else { return }
-        
+
         for effect in choice.effects {
             switch effect.attribute {
             case "health":
@@ -222,28 +223,28 @@ class GameManager: ObservableObject {
                 break
             }
         }
-        
+
         // Update the event with the chosen outcome
         if let index = character.lifeEvents.firstIndex(where: { $0.id == event.id }) {
             character.lifeEvents[index].outcome = choice.outcome
         }
-        
+
         // Update the current events list
         if let index = currentEvents.firstIndex(where: { $0.id == event.id }) {
             currentEvents[index].outcome = choice.outcome
         }
-        
+
         self.character = character
     }
-    
+
     // Add new methods for gameplay actions
-    
+
     func buyPossession(name: String, value: Double, condition: Int = 100) -> Bool {
         guard var character = self.character else { return false }
-        
+
         // Age restrictions
         if character.age < 18 && (
-            name.lowercased().contains("car") || 
+            name.lowercased().contains("car") ||
             name.lowercased().contains("house") ||
             name.lowercased().contains("apartment")
         ) {
@@ -261,7 +262,7 @@ class GameManager: ObservableObject {
             self.character = character
             return false
         }
-        
+
         // Check if they can afford it
         if character.money < value {
             // Create can't afford event
@@ -278,7 +279,7 @@ class GameManager: ObservableObject {
             self.character = character
             return false
         }
-        
+
         // Purchase the possession
         let newPossession = Possession(
             name: name,
@@ -286,10 +287,10 @@ class GameManager: ObservableObject {
             condition: condition,
             yearAcquired: currentYear
         )
-        
+
         character.possessions.append(newPossession)
         character.money -= value
-        
+
         // Create purchase event
         let purchaseEvent = LifeEvent(
             title: "New Purchase",
@@ -301,26 +302,26 @@ class GameManager: ObservableObject {
         )
         currentEvents.append(purchaseEvent)
         character.lifeEvents.append(purchaseEvent)
-        
+
         self.character = character
         return true
     }
-    
+
     func sellPossession(possessionId: UUID) -> Bool {
         guard var character = self.character,
               let index = character.possessions.firstIndex(where: { $0.id == possessionId }) else {
             return false
         }
-        
+
         let possession = character.possessions[index]
-        
+
         // Calculate sell value (based on condition)
         let conditionFactor = Double(possession.condition) / 100.0
         let sellValue = possession.value * conditionFactor * 0.7 // 70% of condition-adjusted value
-        
+
         character.money += sellValue
         character.possessions.remove(at: index)
-        
+
         // Create sell event
         let sellEvent = LifeEvent(
             title: "Sold Possession",
@@ -332,14 +333,14 @@ class GameManager: ObservableObject {
         )
         currentEvents.append(sellEvent)
         character.lifeEvents.append(sellEvent)
-        
+
         self.character = character
         return true
     }
-    
+
     func lookForJob() -> [Career] {
         guard let character = self.character else { return [] }
-        
+
         // Age check
         if character.age < 18 {
             // Create too young event
@@ -352,28 +353,28 @@ class GameManager: ObservableObject {
                 effects: []
             )
             currentEvents.append(tooYoungEvent)
-            
+
             // For teens, could offer part-time jobs here if we wanted
             return []
         }
-        
+
         // Education-based job offerings
         var possibleCareers: [Career] = []
-        
+
         // Get salary range based on education
         let (minSalary, maxSalary) = salaryRangeForEducation(character.education)
-        
+
         // Generate 1-3 random job offerings
         let jobCount = Int.random(in: 1...3)
-        
-        let companies = ["TechCorp", "GlobalEnterprises", "InnovateInc", "NextGen Systems", 
-                        "Apex Industries", "Horizon Group", "FutureWorks", "OmniCorp", 
+
+        let companies = ["TechCorp", "GlobalEnterprises", "InnovateInc", "NextGen Systems",
+                        "Apex Industries", "Horizon Group", "FutureWorks", "OmniCorp",
                         "Stellar Solutions", "PrimeSoft"]
-        
+
         for _ in 0..<jobCount {
             let company = companies.randomElement() ?? "Company"
             let salary = Double.random(in: minSalary...maxSalary)
-            
+
             // Job title based on education
             let title: String
             switch character.education {
@@ -393,7 +394,7 @@ class GameManager: ObservableObject {
                 let titles = ["Research Scientist", "Director", "Principal Engineer", "Department Head"]
                 title = titles.randomElement() ?? "Expert"
             }
-            
+
             let career = Career(
                 title: title,
                 company: company,
@@ -401,16 +402,16 @@ class GameManager: ObservableObject {
                 performanceRating: Int.random(in: 40...70), // Starting performance
                 yearsAtJob: 0
             )
-            
+
             possibleCareers.append(career)
         }
-        
+
         return possibleCareers
     }
-    
+
     func acceptJob(career: Career) {
         guard var character = self.character else { return }
-        
+
         // If they already have a job, create a job transition event
         if character.career != nil {
             let oldCareer = character.career!
@@ -437,14 +438,14 @@ class GameManager: ObservableObject {
             currentEvents.append(newJobEvent)
             character.lifeEvents.append(newJobEvent)
         }
-        
+
         character.career = career
         self.character = character
     }
-    
+
     func quitJob() {
         guard var character = self.character, character.career != nil else { return }
-        
+
         let oldCareer = character.career!
         let quitEvent = LifeEvent(
             title: "Quit Job",
@@ -456,11 +457,11 @@ class GameManager: ObservableObject {
         )
         currentEvents.append(quitEvent)
         character.lifeEvents.append(quitEvent)
-        
+
         character.career = nil
         self.character = character
     }
-    
+
     // Helper to determine salary range based on education
     private func salaryRangeForEducation(_ education: Education) -> (Double, Double) {
         switch education {
