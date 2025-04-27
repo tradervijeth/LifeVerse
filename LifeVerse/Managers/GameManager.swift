@@ -1281,7 +1281,7 @@ class GameManager: ObservableObject {
             // Calculate realistic salary based on US data
             let salary = USSalaryData.calculateRealisticSalary(
                 jobTitle: title,
-                industry: industry,
+                industry: industry.rawValue,
                 education: character.education,
                 level: level
             )
@@ -1303,23 +1303,25 @@ class GameManager: ObservableObject {
                 promotionYears = Int.random(in: 5...8)
             case .executive, .cLevel:
                 promotionYears = nil // No promotion beyond these levels
+            @unknown default:
+                promotionYears = Int.random(in: 3...5)
             }
 
             // Create the career
-            let career = Career(
+            var career = Career(
                 title: title,
                 company: company,
-                salary: salary,
-                industry: industry,
-                level: level,
-                educationRequirement: character.education,
-                performanceRating: Int.random(in: 40...70),
-                yearsAtJob: 0,
-                fieldRequirement: fieldRequirement,
-                specializationRequirement: specializationRequirement,
-                promotionYearsRequired: promotionYears,
-                maxSalary: salary * 1.5
+                salary: salary
             )
+
+            // Set additional properties
+            career.level = level
+            career.performanceRating = Int.random(in: 40...70)
+            career.yearsAtJob = 0
+            career.specialization = specializationRequirement
+            if let promotionYears = promotionYears {
+                career.promotionYearsRequired = promotionYears
+            }
 
             possibleCareers.append(career)
         }
@@ -1906,6 +1908,9 @@ class GameManager: ObservableObject {
             case .cLevel:
                 title = "Chief Technology Officer"
                 fieldRequirement = .computerScience
+            @unknown default:
+                title = "Technology Professional"
+                fieldRequirement = .computerScience
             }
 
             // Add specialization for higher levels
@@ -1934,6 +1939,9 @@ class GameManager: ObservableObject {
                     fieldRequirement = .medicine
                 case .executive, .cLevel:
                     title = "Hospital Director"
+                    fieldRequirement = .medicine
+                @unknown default:
+                    title = "Medical Professional"
                     fieldRequirement = .medicine
                 }
 
@@ -1975,6 +1983,9 @@ class GameManager: ObservableObject {
             case .executive, .cLevel:
                 title = "Chief Financial Officer"
                 fieldRequirement = .finance
+            @unknown default:
+                title = "Finance Professional"
+                fieldRequirement = .finance
             }
 
         case .education:
@@ -2013,6 +2024,8 @@ class GameManager: ObservableObject {
                 title = "Regional Manager"
             case .executive, .cLevel:
                 title = "Retail Operations Director"
+            @unknown default:
+                title = "Retail Professional"
             }
 
         case .legal:
@@ -2033,6 +2046,9 @@ class GameManager: ObservableObject {
                 case .director, .executive, .cLevel:
                     title = "Managing Partner"
                     fieldRequirement = .law
+                @unknown default:
+                    title = "Legal Professional"
+                    fieldRequirement = .law
                 }
 
                 // Add legal specialization
@@ -2047,7 +2063,7 @@ class GameManager: ObservableObject {
             }
 
         // Add more industries as needed
-        default:
+        @unknown default:
             // Generic titles for other industries
             switch level {
             case .entry:
@@ -2068,6 +2084,8 @@ class GameManager: ObservableObject {
                 title = "Executive"
             case .cLevel:
                 title = "Chief Officer"
+            @unknown default:
+                title = "Professional"
             }
         }
 
