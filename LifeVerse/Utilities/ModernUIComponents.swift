@@ -273,6 +273,7 @@ struct EventCardModern: View {
         case .financial: return .mint
         case .random: return .gray
         case .death: return .black
+        @unknown default: return .gray
         }
     }
 
@@ -287,6 +288,7 @@ struct EventCardModern: View {
         case .financial: return "dollarsign.circle.fill"
         case .random: return "questionmark.circle.fill"
         case .death: return "xmark.circle.fill"
+        @unknown default: return "questionmark.circle.fill"
         }
     }
 }
