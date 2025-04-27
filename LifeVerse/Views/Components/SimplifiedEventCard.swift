@@ -10,7 +10,7 @@ import SwiftUI
 struct SimplifiedEventCard: View {
     let event: LifeEvent
     let makeChoice: (EventChoice) -> Void
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -21,15 +21,15 @@ struct SimplifiedEventCard: View {
                     .frame(width: 32, height: 32)
                     .background(colorForEventType(event.type).opacity(0.1))
                     .clipShape(Circle())
-                
+
                 Text(event.title)
                     .font(.headline)
             }
-            
+
             Text(event.description)
                 .font(.body)
                 .foregroundColor(.primary)
-            
+
             if let outcome = event.outcome {
                 Text(outcome)
                     .font(.subheadline)
@@ -37,7 +37,7 @@ struct SimplifiedEventCard: View {
                     .italic()
                     .padding(.top, 2)
             }
-            
+
             if let choices = event.choices, event.outcome == nil {
                 VStack(spacing: 8) {
                     ForEach(choices) { choice in
@@ -61,7 +61,7 @@ struct SimplifiedEventCard: View {
         .background(Color(UIColor.secondarySystemBackground))
         .cornerRadius(12)
     }
-    
+
     // Helper to determine icon based on event type
     private func iconForEventType(_ type: LifeEvent.EventType) -> String {
         switch type {
@@ -73,9 +73,10 @@ struct SimplifiedEventCard: View {
         case .financial: return "dollarsign.circle.fill"
         case .random: return "sparkles"
         case .death: return "cross.fill"
+        @unknown default: return "questionmark.circle.fill"
         }
     }
-    
+
     // Helper to determine color based on event type
     private func colorForEventType(_ type: LifeEvent.EventType) -> Color {
         switch type {
@@ -87,6 +88,7 @@ struct SimplifiedEventCard: View {
         case .financial: return .green
         case .random: return .purple
         case .death: return .gray
+        @unknown default: return .gray
         }
     }
 }
