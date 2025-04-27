@@ -1211,7 +1211,7 @@ class GameManager: ObservableObject {
                         "FinanceFirst", "Legal Eagles", "Construct Pro"]
 
         // Determine career level based on experience and education
-        let level: CareerLevel
+        let level: UnifiedCareerLevel
         if character.career == nil {
             level = .entry
         } else if character.career!.yearsAtJob >= 5 {
@@ -1909,8 +1909,8 @@ class GameManager: ObservableObject {
             }
 
             // Add specialization for higher levels
-            if level.rawValue >= CareerLevel.mid.rawValue {
-                let specializations: [CareerSpecialization] = [
+            if level.rawValue >= UnifiedCareerLevel.mid.rawValue {
+                let specializations: [UnifiedCareerSpecialization] = [
                     .softwareDeveloper, .systemsArchitect, .dataScientist,
                     .cyberSecurityAnalyst, .aiSpecialist, .networkAdministrator
                 ]
@@ -1938,8 +1938,8 @@ class GameManager: ObservableObject {
                 }
 
                 // Add specialization for doctors
-                if level.rawValue >= CareerLevel.mid.rawValue && title.contains("Physician") {
-                    let specializations: [CareerSpecialization] = [
+                if level.rawValue >= UnifiedCareerLevel.mid.rawValue && title.contains("Physician") {
+                    let specializations: [UnifiedCareerSpecialization] = [
                         .generalPractitioner, .surgeon, .pediatrician,
                         .psychiatrist, .cardiologist, .neurologist
                     ]
@@ -1948,7 +1948,7 @@ class GameManager: ObservableObject {
             } else if education.rawValue >= Education.associatesDegree.rawValue {
                 title = "Registered Nurse"
                 fieldRequirement = .nursing
-                if level.rawValue >= CareerLevel.senior.rawValue {
+                if level.rawValue >= UnifiedCareerLevel.senior.rawValue {
                     specializationRequirement = .nursepractitioner
                 }
             } else {
@@ -1982,9 +1982,9 @@ class GameManager: ObservableObject {
                 title = "Teacher"
                 fieldRequirement = .education
 
-                if education.rawValue >= Education.mastersDegree.rawValue && level.rawValue >= CareerLevel.senior.rawValue {
+                if education.rawValue >= Education.mastersDegree.rawValue && level.rawValue >= UnifiedCareerLevel.senior.rawValue {
                     title = "Professor"
-                    if level.rawValue >= CareerLevel.director.rawValue {
+                    if level.rawValue >= UnifiedCareerLevel.director.rawValue {
                         title = "Department Chair"
                     }
                 }
