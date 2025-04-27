@@ -2310,7 +2310,7 @@ class GameManager: ObservableObject {
 
         // Update relationship and character
         relationship.closeness = min(100, relationship.closeness + closenessChange)
-        relationship.lastInteraction = currentYear
+        relationship.lastInteraction = Date() // Use current date instead of year
         relationship.moodModifier = min(20, relationship.moodModifier + (closenessChange / 2))
 
         // Update the relationship in the character's array
