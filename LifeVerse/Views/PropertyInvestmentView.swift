@@ -539,11 +539,6 @@ struct PropertyInvestmentView: View {
 
     // MARK: - Helper methods for market conditions
 
-    // Helper function to convert Banking_MarketCondition to ViewMarketCondition
-    func convertToViewMarketCondition(_ condition: Banking_MarketCondition) -> ViewMarketCondition {
-        return condition.toViewMarketCondition()
-    }
-
     // Helper function for market condition color
     func marketConditionColor(_ condition: ViewMarketCondition) -> Color {
         switch condition {

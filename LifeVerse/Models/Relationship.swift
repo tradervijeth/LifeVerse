@@ -117,7 +117,7 @@ struct Relationship: Codable, Identifiable {
 
         // Random chance to develop issues
         if Double.random(in: 0...1) < 0.2 { // 20% chance per year
-            createIssue()
+            createIssue(year: Calendar.current.component(.year, from: Date()))
         }
 
         // Random chance to resolve issues
@@ -129,7 +129,7 @@ struct Relationship: Codable, Identifiable {
     }
 
     // Create a new relationship issue
-    mutating func createIssue() {
+    mutating func createIssue(year: Int = Calendar.current.component(.year, from: Date())) {
         // Only add if we don't already have too many
         if issues.count < 3, let issueType = RelationshipIssue.IssueType.allCases.randomElement() {
             // Check if we already have this type of issue
@@ -137,7 +137,7 @@ struct Relationship: Codable, Identifiable {
                 let newIssue = RelationshipIssue(
                     type: issueType,
                     severity: Int.random(in: 1...5),
-                    yearStarted: Calendar.current.component(.year, from: Date())
+                    yearStarted: year
                 )
                 issues.append(newIssue)
 
