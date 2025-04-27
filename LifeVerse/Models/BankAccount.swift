@@ -45,6 +45,21 @@ struct BankAccount: Codable, Identifiable {
         case .investment:
             // Investment accounts have variable returns instead of fixed interest
             self.interestRate = 0.0
+        case .mortgage:
+            self.balance = -initialDeposit // Negative balance represents debt
+            self.term = 30 // Default 30-year term
+        case .autoLoan:
+            self.balance = -initialDeposit // Negative balance represents debt
+            self.term = 5 // Default 5-year term
+        case .studentLoan:
+            self.balance = -initialDeposit // Negative balance represents debt
+            self.term = 10 // Default 10-year term
+        case .businessAccount:
+            self.monthlyFee = 15.0
+            self.minimumBalance = 500.0
+        case .retirementAccount:
+            // No special initialization needed
+            break
         }
         
         // Record initial transaction
@@ -77,11 +92,11 @@ struct BankAccount: Codable, Identifiable {
         let interestAmount: Double
         
         switch accountType {
-        case .checking, .savings, .cd:
+        case .checking, .savings, .cd, .businessAccount, .retirementAccount:
             // Positive interest on deposits
             interestAmount = balance * interestRate
             balance += interestAmount
-        case .creditCard, .loan:
+        case .creditCard, .loan, .mortgage, .autoLoan, .studentLoan:
             // Interest charged on debt (negative balance)
             interestAmount = abs(balance) * interestRate
             balance -= interestAmount // Increases debt
@@ -184,7 +199,8 @@ struct BankAccount: Codable, Identifiable {
         switch accountType {
         case .creditCard:
             return creditLimit - abs(min(0, balance))
-        default:
+        case .checking, .savings, .cd, .investment, .mortgage, .autoLoan, 
+             .studentLoan, .loan, .businessAccount, .retirementAccount:
             return max(0, balance)
         }
     }

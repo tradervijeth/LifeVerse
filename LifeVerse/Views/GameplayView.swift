@@ -20,7 +20,7 @@ struct GameplayView: View {
         VStack(spacing: 0) {
             // Character info header
             if let character = gameManager.character {
-                CharacterInfoHeader(character: character, currentYear: gameManager.currentYear)
+                CharacterInfoHeader(character: character, currentYear: gameManager.currentYear, bankManager: gameManager.bankManager)
                     .padding(.top)
             }
             

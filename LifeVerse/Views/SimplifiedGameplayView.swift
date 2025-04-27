@@ -550,7 +550,7 @@ struct SimplifiedGameplayView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
-                        Text("$\(Int(gameManager.calculateNetWorth()).formattedWithSeparator())")
+                        Text("$\(Int(gameManager.getBankingNetWorth()).formattedWithSeparator())")
                             .font(.title2)
                             .foregroundColor(.green)
                     }
@@ -647,7 +647,7 @@ struct SimplifiedGameplayView: View {
         .padding(.top)
     }
 
-    private func bankAccountCard(account: Banking_Account) -> some View {
+    private func bankAccountCard(account: BankAccount) -> some View {
         HStack {
             // Account icon
             Image(systemName: accountIcon(account.accountType))
@@ -846,7 +846,7 @@ struct SimplifiedGameplayView: View {
         return .red
     }
 
-    private func accountIcon(_ type: Banking_AccountType) -> String {
+    private func accountIcon(_ type: BankAccountType) -> String {
         switch type {
         case .checking: return "dollarsign.circle"
         case .savings: return "banknote"
@@ -862,7 +862,7 @@ struct SimplifiedGameplayView: View {
         }
     }
 
-    private func accountColor(_ type: Banking_AccountType) -> Color {
+    private func accountColor(_ type: BankAccountType) -> Color {
         switch type {
         case .checking: return .blue
         case .savings: return .green

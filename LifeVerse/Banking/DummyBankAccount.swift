@@ -15,9 +15,33 @@ struct DummyBankAccount: Codable, Identifiable {
     var balance: Double
     var interestRate: Double
     var isActive: Bool = true
-    var transactions: [Banking_Transaction] = []
+    var transactions: [BankTransaction] = []
     var creationYear: Int
 
+    // Helper to convert between transaction types
+    private func convertToBankTransactionType(_ type: Banking_TransactionType) -> BankTransactionType {
+        switch type {
+        case .deposit: return .deposit
+        case .withdrawal: return .withdrawal
+        case .transfer: return .transfer
+        case .payment: return .payment
+        case .fee: return .fee
+        case .interest: return .interest
+        case .loan: return .loan
+        case .purchase: return .purchase
+        case .refund: return .refund
+        case .cashback: return .cashback
+        case .directDeposit: return .directDeposit
+        case .check: return .check
+        case .atmTransaction: return .atmTransaction
+        case .wireTransfer: return .wireTransfer
+        case .investmentReturn: return .investmentReturn
+        case .sale, .tax, .investment, .specialEvent:
+            // These don't exist in BankTransactionType, default to something sensible
+            return .transfer
+        }
+    }
+    
     // Initialization
     init(type: Banking_AccountType, balance: Double, interestRate: Double? = nil, creationYear: Int? = nil) {
         self.id = UUID()
@@ -30,11 +54,14 @@ struct DummyBankAccount: Codable, Identifiable {
 
     // Add a transaction
     mutating func addTransaction(type: Banking_TransactionType, amount: Double, description: String) {
-        let transaction = Banking_Transaction(
-            date: Date(),
-            type: type,
+        // Convert Banking_TransactionType to BankTransactionType
+        let bankType = convertToBankTransactionType(type)
+        
+        let transaction = BankTransaction(
+            type: bankType,
             amount: amount,
             description: description,
+            date: Date(),
             year: Calendar.current.component(.year, from: Date())
         )
 
@@ -44,7 +71,7 @@ struct DummyBankAccount: Codable, Identifiable {
             self.balance += amount
         case .withdrawal, .payment, .fee, .purchase, .atmTransaction, .tax:
             self.balance -= amount
-        case .transfer, .loan, .investment, .specialEvent:
+        case .transfer, .loan, .investment, .specialEvent, .wireTransfer, .check:
             // For transfers, investments, and special events, handle separately depending on context
             break
         }
@@ -65,11 +92,11 @@ struct DummyBankAccount: Codable, Identifiable {
         let interestAmount = balance * interestRate
 
         // Create an interest transaction
-        let transaction = Banking_Transaction(
-            date: Date(),
+        let transaction = BankTransaction(
             type: .interest,
             amount: interestAmount,
             description: "Interest payment",
+            date: Date(),
             year: year
         )
 

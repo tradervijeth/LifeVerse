@@ -68,7 +68,9 @@ struct AgeUpView: View {
                 .foregroundColor(.secondary)
             
             VStack(alignment: .leading, spacing: 15) {
-                if let career = summary.career {
+                let hasCareer = summary.career != nil
+                if hasCareer {
+                    let career = summary.career!
                     HStack {
                         Image(systemName: "briefcase.fill")
                             .foregroundColor(.blue)
@@ -205,7 +207,8 @@ struct AgeUpView: View {
                 
                 // Calculate income added (excluding effects from events to avoid double counting)
                 var incomeAdded: Double = 0
-                if let career = character.career {
+                let hasCareer = character.career != nil
+                if hasCareer {
                     incomeAdded = character.money - beforeMoney
                     // If money decreased, don't show negative income (that would be from events)
                     if incomeAdded < 0 {

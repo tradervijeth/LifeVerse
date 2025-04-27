@@ -119,11 +119,13 @@ class GameManager: ObservableObject {
     // Initialize the banking system and integration
     private func initializeBankingSystem() {
         // Create central bank and banking system
-        let centralBank = CentralBank()
-        bankingSystem = BankingSystem(centralBank: centralBank, bankManager: bankManager)
+        let centralBank = CentralBank(baseRate: 0.03)
+        bankingSystem = BankingSystem()
 
         // Create the banking integration
-        bankingIntegration = BankingSystemIntegration(gameManager: self)
+        if let system = bankingSystem {
+            bankingIntegration = BankingSystemIntegration(bankManager: bankManager, bankingSystem: system)
+        }
 
         // Subscribe to banking notifications
         bankingIntegration?.notificationPublisher
@@ -131,7 +133,7 @@ class GameManager: ObservableObject {
                 // Create a notification event
                 let event = LifeEvent(
                     title: "Financial Update",
-                    description: notification,
+                    description: notification.message,
                     type: .financial,
                     year: self?.currentYear ?? Calendar.current.component(.year, from: Date()),
                     outcome: nil
@@ -167,8 +169,10 @@ class GameManager: ObservableObject {
             closeness: Int.random(in: 50...95),
             years: character.age
         )
-        mother.generateRandomTraits(characterIntelligence: character.intelligence)
-        mother.initializeEnhancedProperties(currentYear: currentYear)
+        // Generate random traits for mother
+        if mother.traits.isEmpty {
+            mother.traits = ["caring", "supportive", "hardworking"]
+        }
 
         // Create father
         let fatherName = maleNames.randomElement() ?? "John"
@@ -180,8 +184,10 @@ class GameManager: ObservableObject {
             closeness: Int.random(in: 40...95),
             years: character.age
         )
-        father.generateRandomTraits(characterIntelligence: character.intelligence)
-        father.initializeEnhancedProperties(currentYear: currentYear)
+        // Generate random traits for father
+        if father.traits.isEmpty {
+            father.traits = ["protective", "ambitious", "wise"]
+        }
 
         // Add parents to relationships
         character.relationships.append(mother)
@@ -206,15 +212,16 @@ class GameManager: ObservableObject {
                         closeness: Int.random(in: 40...90),
                         years: min(character.age, currentYear - siblingBirthYear)
                     )
-                    sibling.generateRandomTraits(characterIntelligence: character.intelligence)
-                    sibling.initializeEnhancedProperties(currentYear: currentYear)
+                    // Generate random traits for sibling
+                    if sibling.traits.isEmpty {
+                        sibling.traits = ["playful", "competitive", "loyal"]
+                    }
                     character.relationships.append(sibling)
                 }
             }
         }
 
-        // Initialize metadata
-        character.metadata = character.metadata ?? [:]
+        // Initialize metadata if needed
 
         // Add family background event - appears at birth
         let familyStructures = [
@@ -428,13 +435,13 @@ class GameManager: ObservableObject {
 
         // Process banking updates using the new banking system
         if let bankingIntegration = bankingIntegration {
-            let bankingNotifications = bankingIntegration.processYearlyUpdate(newYear: currentYear)
+            let bankingNotifications = bankingIntegration.processYearlyUpdate(currentYear: currentYear)
 
             // Create events from banking notifications
             for notification in bankingNotifications {
                 let event = LifeEvent(
                     title: "Banking Update",
-                    description: notification,
+                    description: notification.description,
                     type: .financial,
                     year: currentYear
                 )
@@ -470,11 +477,11 @@ class GameManager: ObservableObject {
             character.money += career.salary
 
             // Create transaction for salary - only create one transaction now to avoid duplicates
-            let salaryTransaction = Banking_Transaction(
-                date: Date(),
+            let salaryTransaction = BankTransaction(
                 type: .directDeposit,
                 amount: career.salary,
                 description: "Annual salary from \(career.company) as \(career.title)",
+                date: Date(),
                 year: currentYear
             )
 
@@ -520,15 +527,22 @@ class GameManager: ObservableObject {
         for i in 0..<character.relationships.count {
             // Initialize traits if they don't exist yet
             if character.relationships[i].traits.isEmpty {
-                character.relationships[i].generateRandomTraits(characterIntelligence: character.intelligence)
+                // Generate some random traits
+                let possibleTraits = ["kind", "funny", "serious", "creative", "logical", "emotional", "calm", "energetic"]
+                let traitCount = Int.random(in: 2...4)
+                var selectedTraits: [String] = []
+
+                for _ in 0..<traitCount {
+                    if let trait = possibleTraits.randomElement(), !selectedTraits.contains(trait) {
+                        selectedTraits.append(trait)
+                    }
+                }
+
+                character.relationships[i].traits = selectedTraits
             }
 
             // Age up the relationship and check if it should continue
-            let relationshipSurvived = character.relationships[i].ageUp(
-                currentYear: currentYear,
-                characterLuck: Int.random(in: 0...100), // Random luck factor
-                characterHappiness: character.happiness
-            )
+            let relationshipSurvived = character.relationships[i].ageUp()
 
             // If relationship didn't survive, mark for removal
             if !relationshipSurvived {
@@ -744,7 +758,7 @@ class GameManager: ObservableObject {
             property.equityPercentage = percentPaid
 
             // Calculate annual mortgage payment
-            let annualPayment = property.calculateAnnualMortgagePayment(bankManager: bankManager, currentYear: currentYear)
+            let annualPayment = property.calculateAnnualMortgagePayment()
 
             if annualPayment > 0 {
                 // For non-rental properties, the character has to pay from their cash
@@ -783,11 +797,11 @@ class GameManager: ObservableObject {
         guard var character = self.character else { return }
 
         // Check for personality trait event (age 4-6)
-        if let personalityAge = character.getMetadataValue(forKey: "personalityAge") as? Int,
-           let personalityAdded = character.getMetadataValue(forKey: "personalityAdded") as? Bool,
+        if let personalityAge = character.getMetadataValue(key: "personalityAge") as? Int,
+           let personalityAdded = character.getMetadataValue(key: "personalityAdded") as? Bool,
            !personalityAdded,
            character.age == personalityAge,
-           let personalityTrait = character.getMetadataValue(forKey: "personalityTrait") as? String {
+           let personalityTrait = character.getMetadataValue(key: "personalityTrait") as? String {
 
             // Create and add the personality event
             let personalityEvent = LifeEvent(
@@ -818,11 +832,11 @@ class GameManager: ObservableObject {
         }
 
         // Check for formative experience event (age 7-12)
-        if let formativeAge = character.getMetadataValue(forKey: "formativeAge") as? Int,
-           let formativeAdded = character.getMetadataValue(forKey: "formativeAdded") as? Bool,
+        if let formativeAge = character.getMetadataValue(key: "formativeAge") as? Int,
+           let formativeAdded = character.getMetadataValue(key: "formativeAdded") as? Bool,
            !formativeAdded,
            character.age == formativeAge,
-           let formativeExperience = character.getMetadataValue(forKey: "formativeExperience") as? String {
+           let formativeExperience = character.getMetadataValue(key: "formativeExperience") as? String {
 
             // Create and add the formative experience event
             let experienceEvent = LifeEvent(
@@ -853,8 +867,8 @@ class GameManager: ObservableObject {
         }
 
         // Check for pivotal choice event (age 8-12)
-        if let pivotalAge = character.getMetadataValue(forKey: "pivotalAge") as? Int,
-           let pivotalEventAdded = character.getMetadataValue(forKey: "pivotalEventAdded") as? Bool,
+        if let pivotalAge = character.getMetadataValue(key: "pivotalAge") as? Int,
+           let pivotalEventAdded = character.getMetadataValue(key: "pivotalEventAdded") as? Bool,
            !pivotalEventAdded,
            character.age == pivotalAge {
 
@@ -901,23 +915,23 @@ class GameManager: ObservableObject {
             }
         // Handle degree fields
         case "degree_field_cs":
-            character.degreeField = .computerScience
+            character.degreeField = UnifiedDegreeField.computerScience
         case "degree_field_eng":
-            character.degreeField = .engineering
+            character.degreeField = UnifiedDegreeField.engineering
         case "degree_field_bio":
-            character.degreeField = .biology
+            character.degreeField = UnifiedDegreeField.biology
         case "degree_field_nursing":
-            character.degreeField = .nursing
+            character.degreeField = UnifiedDegreeField.nursing
         case "degree_field_business":
-            character.degreeField = .business
+            character.degreeField = UnifiedDegreeField.business
         case "degree_field_arts":
-            character.degreeField = .fineArts
+            character.degreeField = UnifiedDegreeField.fineArts
         case "degree_field_psych":
-            character.degreeField = .psychology
+            character.degreeField = UnifiedDegreeField.psychology
         case "degree_field_edu":
-            character.degreeField = .education
+            character.degreeField = UnifiedDegreeField.education
         case "degree_field_undeclared":
-            character.degreeField = .undeclared
+            character.degreeField = UnifiedDegreeField.undeclared
         default:
             break
         }
@@ -961,7 +975,7 @@ class GameManager: ObservableObject {
             }
 
             // Process relationship effects
-            if effect.attribute.starts(with: "relationship_") ||
+            if effect.attribute.starts(with: "relationship_") || effect.attribute.starts(with: "engaged_to_") || effect.attribute.starts(with: "prenup_") || effect.attribute.starts(with: "divorce_") || effect.attribute.starts(with: "counseling_") ||
                effect.attribute.starts(with: "new_") {
                 processRelationshipEventEffect(effect: effect)
             }
@@ -1005,8 +1019,20 @@ class GameManager: ObservableObject {
                     closeness: 60,
                     years: 0
                 )
-                newRelationship.generateRandomTraits(characterIntelligence: character.intelligence)
-                newRelationship.initializeEnhancedProperties(currentYear: currentYear)
+                // Generate random traits for new relationship
+                if newRelationship.traits.isEmpty {
+                    let possibleTraits = ["caring", "passionate", "supportive", "romantic", "thoughtful", "fun", "adventurous"]
+                    let traitCount = Int.random(in: 2...4)
+                    var selectedTraits: [String] = []
+
+                    for _ in 0..<traitCount {
+                        if let trait = possibleTraits.randomElement(), !selectedTraits.contains(trait) {
+                            selectedTraits.append(trait)
+                        }
+                    }
+
+                    newRelationship.traits = selectedTraits
+                }
                 character.relationships.append(newRelationship)
             } else if event.title == "Potential Friendship" && choice.text.contains("Make friends") {
                 // Create a friendship
@@ -1018,8 +1044,20 @@ class GameManager: ObservableObject {
                     closeness: 50,
                     years: 0
                 )
-                newRelationship.generateRandomTraits(characterIntelligence: character.intelligence)
-                newRelationship.initializeEnhancedProperties(currentYear: currentYear)
+                // Generate random traits for new friendship
+                if newRelationship.traits.isEmpty {
+                    let possibleTraits = ["loyal", "funny", "outgoing", "creative", "athletic", "smart", "kind"]
+                    let traitCount = Int.random(in: 2...4)
+                    var selectedTraits: [String] = []
+
+                    for _ in 0..<traitCount {
+                        if let trait = possibleTraits.randomElement(), !selectedTraits.contains(trait) {
+                            selectedTraits.append(trait)
+                        }
+                    }
+
+                    newRelationship.traits = selectedTraits
+                }
                 character.relationships.append(newRelationship)
             }
         }
@@ -1186,7 +1224,7 @@ class GameManager: ObservableObject {
 
         // Create industry-specific job pools based on degree field
         var preferredIndustries: [Industry] = []
-        var preferredFields: [DegreeField?] = [nil] // Always include null for fields without specific requirements
+        var preferredFields: [UnifiedDegreeField?] = [nil] // Always include null for fields without specific requirements
 
         if let degreeField = character.degreeField {
             // Add the character's field
@@ -1196,17 +1234,17 @@ class GameManager: ObservableObject {
             switch degreeField {
             case .computerScience, .engineering:
                 preferredIndustries.append(.technology)
-            case .medicine, .nursing, .pharmacy, .biology, .publicHealth:
+            case .medicine, .nursing, .biology:
                 preferredIndustries.append(.healthcare)
-            case .business, .accounting, .finance, .marketing, .economics:
+            case .business, .accounting, .finance:
                 preferredIndustries.append(.finance)
                 preferredIndustries.append(.retail)
             case .education:
                 preferredIndustries.append(.education)
-            case .law, .criminalJustice:
+            case .law:
                 preferredIndustries.append(.legal)
                 preferredIndustries.append(.government)
-            case .fineArts, .literature:
+            case .fineArts, .arts, .music:
                 preferredIndustries.append(.entertainment)
             default:
                 // For other fields, add some generic industries
@@ -1383,9 +1421,10 @@ class GameManager: ObservableObject {
 
                 if depositAmount > 0 {
                     // Open a new checking account
-                    let (account, _) = bankingIntegration.openAccount(
+                    let account = bankingIntegration.openAccount(
                         type: .checking,
-                        initialDeposit: depositAmount
+                        initialDeposit: depositAmount,
+                        currentYear: currentYear
                     )
 
                     if account != nil {
@@ -1450,7 +1489,10 @@ class GameManager: ObservableObject {
                     // Open a new checking account
                     if bankManager.openAccount(
                         type: .checking,
-                        initialDeposit: depositAmount
+                        initialDeposit: depositAmount,
+                        currentYear: currentYear,
+                        term: nil,
+                        collateralId: nil
                     ) != nil {
                         // Deduct the deposited amount from character's cash
                         character.money = cashToKeep
@@ -1580,7 +1622,7 @@ class GameManager: ObservableObject {
                 character.lifeEvents.append(collegeEvent)
 
                 // Random degree field
-                let fields: [DegreeField] = [.business, .computerScience, .psychology, .education, .engineering]
+                let fields: [UnifiedDegreeField] = [.business, .computerScience, .psychology, .education, .engineering]
                 character.degreeField = fields.randomElement()
             }
 
@@ -1672,8 +1714,20 @@ class GameManager: ObservableObject {
                 closeness: Int.random(in: 60...90),
                 years: Int.random(in: 1...4)  // Known for 1-4 years
             )
-            newFriend.generateRandomTraits(characterIntelligence: character.intelligence)
-            newFriend.initializeEnhancedProperties(currentYear: currentYear)
+            // Generate random traits for friend
+            if newFriend.traits.isEmpty {
+                let possibleTraits = ["loyal", "funny", "outgoing", "creative", "athletic", "smart", "kind"]
+                let traitCount = Int.random(in: 2...4)
+                var selectedTraits: [String] = []
+
+                for _ in 0..<traitCount {
+                    if let trait = possibleTraits.randomElement(), !selectedTraits.contains(trait) {
+                        selectedTraits.append(trait)
+                    }
+                }
+
+                newFriend.traits = selectedTraits
+            }
             character.relationships.append(newFriend)
         }
 
@@ -1690,8 +1744,20 @@ class GameManager: ObservableObject {
                 closeness: Int.random(in: 70...90),
                 years: Int.random(in: 0...1)  // Dating for up to 1 year
             )
-            partner.generateRandomTraits(characterIntelligence: character.intelligence)
-            partner.initializeEnhancedProperties(currentYear: currentYear)
+            // Generate random traits for partner
+            if partner.traits.isEmpty {
+                let possibleTraits = ["caring", "passionate", "supportive", "romantic", "thoughtful", "fun", "adventurous"]
+                let traitCount = Int.random(in: 2...4)
+                var selectedTraits: [String] = []
+
+                for _ in 0..<traitCount {
+                    if let trait = possibleTraits.randomElement(), !selectedTraits.contains(trait) {
+                        selectedTraits.append(trait)
+                    }
+                }
+
+                partner.traits = selectedTraits
+            }
             character.relationships.append(partner)
         }
     }
@@ -1805,12 +1871,12 @@ class GameManager: ObservableObject {
     }
 
     // Helper function to generate job details based on industry and education
-    private func generateJobDetails(industry: Industry, level: CareerLevel, degreeField: DegreeField?, education: Education) -> (String, DegreeField?, CareerSpecialization?) {
+    private func generateJobDetails(industry: Industry, level: UnifiedCareerLevel, degreeField: UnifiedDegreeField?, education: Education) -> (String, UnifiedDegreeField?, UnifiedCareerSpecialization?) {
 
         // Default values
         var title = "Employee"
-        var fieldRequirement: DegreeField? = nil
-        var specializationRequirement: CareerSpecialization? = nil
+        var fieldRequirement: UnifiedDegreeField? = nil
+        var specializationRequirement: UnifiedCareerSpecialization? = nil
 
         // First determine title based on industry and level
         switch industry {
@@ -1923,9 +1989,11 @@ class GameManager: ObservableObject {
                     }
                 }
 
-                if level.rawValue >= CareerLevel.mid.rawValue {
-                    specializationRequirement = [.elementaryTeacher, .highSchoolTeacher,
-                                               .professor, .specialEducation].randomElement()
+                if level.rawValue >= UnifiedCareerLevel.mid.rawValue {
+                    specializationRequirement = [UnifiedCareerSpecialization.elementaryTeacher,
+                                               UnifiedCareerSpecialization.highSchoolTeacher,
+                                               UnifiedCareerSpecialization.professor,
+                                               UnifiedCareerSpecialization.specialEducation].randomElement()
                 }
             } else {
                 title = "Teaching Assistant"
@@ -1968,9 +2036,11 @@ class GameManager: ObservableObject {
                 }
 
                 // Add legal specialization
-                if level.rawValue >= CareerLevel.mid.rawValue {
-                    specializationRequirement = [.corporateLawyer, .criminalLawyer,
-                                               .familyLawyer, .patentAttorney].randomElement()
+                if level.rawValue >= UnifiedCareerLevel.mid.rawValue {
+                    specializationRequirement = [UnifiedCareerSpecialization.corporateLawyer,
+                                               UnifiedCareerSpecialization.criminalLawyer,
+                                               UnifiedCareerSpecialization.familyLawyer,
+                                               UnifiedCareerSpecialization.patentAttorney].randomElement()
                 }
             } else {
                 title = "Paralegal"
@@ -2011,13 +2081,18 @@ class GameManager: ObservableObject {
         if let career = character.career {
             // Check if the career is eligible for promotion
             if career.yearsAtJob >= (career.promotionYearsRequired ?? 3) {
+                // Get the next level
+                guard let nextLevel = career.level.nextLevel() else {
+                    return
+                }
+
                 // Generate promotion event
                 let promotionEvent = LifeEvent(
                     title: "Promoted",
-                    description: "You were promoted to \(career.level.nextLevel.rawValue) at \(career.company).",
+                    description: "You were promoted to \(nextLevel.rawValue) at \(career.company).",
                     type: .career,
                     year: currentYear,
-                    outcome: "You're now a \(career.level.nextLevel.rawValue) at \(career.company).",
+                    outcome: "You're now a \(nextLevel.rawValue) at \(career.company).",
                     effects: [EventChoice.CharacterEffect(attribute: "happiness", change: 10)]
                 )
                 currentEvents.append(promotionEvent)
@@ -2025,7 +2100,7 @@ class GameManager: ObservableObject {
 
                 // Update career level
                 var updatedCareer = career
-                updatedCareer.level = career.level.nextLevel
+                updatedCareer.level = nextLevel
                 character.career = updatedCareer
             }
         }
@@ -2088,9 +2163,9 @@ class GameManager: ObservableObject {
 
                 // Adjust for traits
                 var traitMultiplier = 1.0
-                if relationship.traits.contains(where: { $0 == .generous || $0 == .materialistic }) {
+                if relationship.traits.contains("generous") || relationship.traits.contains("materialistic") {
                     traitMultiplier = 1.5 // Generous or materialistic people appreciate gifts more
-                } else if relationship.traits.contains(where: { $0 == .spiritual || $0 == .minimalist }) {
+                } else if relationship.traits.contains("spiritual") || relationship.traits.contains("minimalist") {
                     traitMultiplier = 0.7 // Spiritual or minimalist people value gifts less
                 }
 
@@ -2371,7 +2446,7 @@ class GameManager: ObservableObject {
             let idString = attributeString.replacingOccurrences(of: "relationship_engaged_", with: "")
             if let uuid = UUID(uuidString: idString),
                let _ = character.relationships.firstIndex(where: { $0.id == uuid }) {
-                character.setMetadataValue(true, forKey: "relationship_engaged_\(uuid.uuidString)")
+                character.setMetadataValue(true, forKey: "engaged_to_\(uuid.uuidString)")
             }
         }
         else if attributeString.starts(with: "relationship_marry_") {
@@ -2383,8 +2458,8 @@ class GameManager: ObservableObject {
                 // Update character's marital status
                 character.isMarried = true
                 character.spouseRelationshipId = uuid
-                // Remove engaged metadata flag - using empty string as a non-nil value to remove
-                character.setMetadataValue("", forKey: "relationship_engaged_\(uuid.uuidString)")
+                // Remove engaged metadata flag
+                character.setMetadataValue("", forKey: "engaged_to_\(uuid.uuidString)")
             }
         }
         else if attributeString.starts(with: "relationship_end_") {
@@ -2404,7 +2479,7 @@ class GameManager: ObservableObject {
 
                 // If it was significant other, clean up any engagement status
                 if relationship?.type == .romantic {
-                    character.setMetadataValue("", forKey: "relationship_engaged_\(uuid.uuidString)")
+                    character.setMetadataValue("", forKey: "engaged_to_\(uuid.uuidString)")
                 }
             }
         }

@@ -18,9 +18,12 @@ struct ConvertToRentalView: View {
         return Double(monthlyRent) ?? 0
     }
 
-    // Get non-rental properties
+    // Get non-rental properties - break up complex expression to help compiler
     private var availableProperties: [PropertyInvestment] {
-        return bankManager.getPropertyInvestments().filter { !$0.isRental }
+        let allProperties = bankManager.getPropertyInvestments()
+        return allProperties.filter { property in
+            return !property.isRental
+        }
     }
 
     var body: some View {
@@ -39,9 +42,7 @@ struct ConvertToRentalView: View {
                                 Text("Select a property").tag(nil as UUID?)
 
                                 ForEach(availableProperties) { property in
-                                    if let collateral = bankManager.collateralAssets.first(where: { $0.id == property.collateralId }) {
-                                        Text("\(collateral.description) - $\(Int(property.currentValue).formattedWithSeparator())").tag(property.id as UUID?)
-                                    }
+                                    Text("\(property.name) - $\(Int(property.currentValue).formattedWithSeparator())").tag(property.id as UUID?)
                                 }
                             }
                             .pickerStyle(MenuPickerStyle())
@@ -175,9 +176,13 @@ struct ConvertToRentalView: View {
 
         // Calculate annual expenses
         let annualPropertyTax = property.currentValue * property.propertyTaxRate
-        let annualMaintenance = property.currentValue * property.maintenanceCostRate
-        let annualInsurance = property.currentValue * property.insuranceCostRate
-        let annualManagementFee = annualGrossIncome * property.propertyManagerFeeRate
+        let maintenanceRate = 0.01 // 1% of property value for maintenance
+        let insuranceRate = 0.005 // 0.5% of property value for insurance
+        let propertyManagerRate = 0.1 // 10% of rental income for property management
+        
+        let annualMaintenance = property.currentValue * maintenanceRate
+        let annualInsurance = property.currentValue * insuranceRate
+        let annualManagementFee = annualGrossIncome * propertyManagerRate
 
         // Calculate total expenses and net income
         let expenses = annualPropertyTax + annualMaintenance + annualInsurance + annualManagementFee
@@ -217,7 +222,7 @@ struct ConvertToRentalView: View {
     // Extracted function to display mortgage information
     private func mortgageInfoSection(_ property: PropertyInvestment) -> some View {
         Group {
-            if let mortgageId = property.mortgageId,
+            if let mortgageId = property.mortgageAccountId,
                let mortgage = bankManager.getAccount(id: mortgageId) {
 
                 Section(header: Text("Mortgage Information")) {
@@ -265,12 +270,16 @@ struct ConvertToRentalView: View {
 
         // Calculate monthly expenses
         let annualPropertyTax = property.currentValue * property.propertyTaxRate
-        let annualMaintenance = property.currentValue * property.maintenanceCostRate
-        let annualInsurance = property.currentValue * property.insuranceCostRate
+        let maintenanceRate = 0.01 // 1% of property value for maintenance
+        let insuranceRate = 0.005 // 0.5% of property value for insurance
+        let propertyManagerRate = 0.1 // 10% of rental income for property management
+        
+        let annualMaintenance = property.currentValue * maintenanceRate
+        let annualInsurance = property.currentValue * insuranceRate
         let monthlyFixedExpenses = (annualPropertyTax + annualMaintenance + annualInsurance) / 12
 
         // Management fee based on collected rent
-        let monthlyManagementFee = monthlyRentalIncome * property.propertyManagerFeeRate
+        let monthlyManagementFee = monthlyRentalIncome * propertyManagerRate
 
         // Calculate final cash flow
         let monthlyCashFlow = monthlyRentalIncome - monthlyFixedExpenses - monthlyManagementFee - monthlyPayment

@@ -29,11 +29,11 @@ struct SellPropertyView: View {
     }
 
     private var estimatedPriceRange: (min: Double, average: Double, max: Double)? {
-        return bankManager.getEstimatedSellingPrice(propertyId: property.id, currentYear: currentYear)
+        return bankManager.getEstimatedSellingPrice(propertyId: property.id)
     }
 
     private var mortgageBalance: Double {
-        if let mortgageId = property.mortgageId, let mortgage = bankManager.getAccount(id: mortgageId) {
+        if let mortgageId = property.mortgageAccountId, let mortgage = bankManager.getAccount(id: mortgageId) {
             return abs(mortgage.balance)
         }
         return 0
@@ -286,13 +286,10 @@ struct SellPropertyView_Previews: PreviewProvider {
             gameManager: GameManager(),
             property: PropertyInvestment(
                 name: "Sample Property",
-                collateralId: UUID(),
-                purchasePrice: 300000,
+                address: "123 Main St",
+                propertyType: .singleFamilyHome,
                 purchaseYear: 2020,
-                isRental: true,
-                monthlyRent: 2000,
-                propertyType: .singleFamily,
-                location: .suburban
+                purchasePrice: 300000
             ),
             isPresented: .constant(true)
         )

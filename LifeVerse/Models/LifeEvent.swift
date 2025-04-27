@@ -8,6 +8,7 @@ import Foundation
 
 struct LifeEvent: Codable, Identifiable {
     var id = UUID()
+    var eventIdentifier: String = "" // Unique identifier for specific events
     var title: String
     var description: String
     var type: EventType
@@ -26,6 +27,7 @@ struct LifeEvent: Codable, Identifiable {
         case financial
         case random
         case death
+        case retirement
     }
     
     init(title: String, description: String, type: EventType, year: Int, choices: [EventChoice]? = nil, outcome: String? = nil, effects: [EventChoice.CharacterEffect]? = nil) {
@@ -45,6 +47,7 @@ struct EventChoice: Codable, Identifiable {
     var text: String
     var outcome: String
     var effects: [CharacterEffect]
+    var leadsTo: String? = nil // Optional identifier for follow-up events
     
     struct CharacterEffect: Codable {
         var attribute: String // e.g., "health", "happiness", "money"
