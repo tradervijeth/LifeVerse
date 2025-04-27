@@ -859,6 +859,7 @@ struct SimplifiedGameplayView: View {
         case .studentLoan: return "book"
         case .businessAccount: return "briefcase"
         case .retirementAccount: return "leaf"
+        @unknown default: return "questionmark.circle"
         }
     }
 
@@ -870,6 +871,7 @@ struct SimplifiedGameplayView: View {
         case .loan, .mortgage, .autoLoan, .studentLoan: return .red
         case .cd: return .orange
         case .investment, .businessAccount, .retirementAccount: return .indigo
+        @unknown default: return .gray
         }
     }
 
@@ -906,6 +908,9 @@ struct SimplifiedGameplayView: View {
             // Handle breakup
             gameManager.interactWithRelationship(at: index, interaction: .argue)
             gameManager.createEvent(title: "Relationship End", description: "You decided to end your relationship with \(relationship.name).", type: .relationship)
+        @unknown default:
+            gameManager.interactWithRelationship(at: index, interaction: .spendTime)
+            gameManager.createEvent(title: "Spending Time", description: "You spent time with \(relationship.name).", type: .relationship)
         }
     }
 }
