@@ -15,6 +15,7 @@ struct BankingView: View {
     @State private var showLoanApplicationSheet: Bool = false
     @State private var amount: String = ""
     @State private var transferToAccountId: UUID? = nil
+    @State private var creditReportRequests: Int = 0
     
     private var bankManager: BankManager {
         return gameManager.bankManager
@@ -192,11 +193,11 @@ struct BankingView: View {
                         .padding()
                 } else {
                     // Group accounts by type
-                    let checkingAccounts = bankManager.getAccounts(ofType: .checking)
-                    let savingsAccounts = bankManager.getAccounts(ofType: .savings)
-                    let cdAccounts = bankManager.getAccounts(ofType: .cd)
-                    let investmentAccounts = bankManager.getAccounts(ofType: .investment)
-                    let creditCards = bankManager.getAccounts(ofType: .creditCard)
+                    let checkingAccounts = bankManager.getActiveAccounts().filter { $0.accountType == .checking }
+                    let savingsAccounts = bankManager.getActiveAccounts().filter { $0.accountType == .savings }
+                    let cdAccounts = bankManager.getActiveAccounts().filter { $0.accountType == .cd }
+                    let investmentAccounts = bankManager.getActiveAccounts().filter { $0.accountType == .investment }
+                    let creditCards = bankManager.getActiveAccounts().filter { $0.accountType == .creditCard }
                     
                     // Display account groups
                     if !checkingAccounts.isEmpty {
@@ -228,7 +229,7 @@ struct BankingView: View {
                             Text("Total Deposits:")
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Text("$\(Int(bankManager.getTotalDeposits()).formattedWithSeparator())")
+                            Text("$\(Int(bankManager.getTotalSavings()).formattedWithSeparator())")
                                 .fontWeight(.medium)
                         }
                         
@@ -245,9 +246,9 @@ struct BankingView: View {
                             Text("Net Worth:")
                                 .font(.headline)
                             Spacer()
-                            Text("$\(Int(bankManager.getNetWorth()).formattedWithSeparator())")
+                            Text("$\(Int(bankManager.calculateNetWorth()).formattedWithSeparator())")
                                 .font(.headline)
-                                .foregroundColor(bankManager.getNetWorth() >= 0 ? .green : .red)
+                                .foregroundColor(bankManager.calculateNetWorth() >= 0 ? .green : .red)
                         }
                     }
                     .padding()
@@ -365,7 +366,7 @@ struct BankingView: View {
                 
                 creditFactorRow(icon: "creditcard", factor: "Credit Mix", description: "Variety of credit types", isPositive: bankManager.getActiveAccounts().count > 2)
                 
-                creditFactorRow(icon: "magnifyingglass", factor: "Credit Inquiries", description: "\(bankManager.creditReportRequests) recent inquiries", isPositive: bankManager.creditReportRequests < 2)
+                creditFactorRow(icon: "magnifyingglass", factor: "Credit Inquiries", description: "\(creditReportRequests) recent inquiries", isPositive: creditReportRequests < 2)
             }
             .padding()
             .background(Color(UIColor.secondarySystemBackground))
@@ -375,6 +376,7 @@ struct BankingView: View {
             Button(action: {
                 // Request credit report
                 _ = bankManager.requestCreditReport()
+                creditReportRequests += 1
             }) {
                 Text("Request Credit Report")
                     .foregroundColor(.white)
@@ -393,10 +395,10 @@ struct BankingView: View {
                 .font(.headline)
             
             // Get all loan types
-            let loans = bankManager.getAccounts(ofType: .loan)
-            let mortgages = bankManager.getAccounts(ofType: .mortgage)
-            let autoLoans = bankManager.getAccounts(ofType: .autoLoan)
-            let studentLoans = bankManager.getAccounts(ofType: .studentLoan)
+            let loans = bankManager.getActiveAccounts().filter { $0.accountType == .loan }
+            let mortgages = bankManager.getActiveAccounts().filter { $0.accountType == .mortgage }
+            let autoLoans = bankManager.getActiveAccounts().filter { $0.accountType == .autoLoan }
+            let studentLoans = bankManager.getActiveAccounts().filter { $0.accountType == .studentLoan }
             
             let allLoans = loans + mortgages + autoLoans + studentLoans
             
@@ -420,7 +422,8 @@ struct BankingView: View {
                         Text("Maximum Loan Amount:")
                             .foregroundColor(.secondary)
                         Spacer()
-                        Text("$\(Int(bankManager.maximumLoanAmount()).formattedWithSeparator())")
+                        let maxAmount = Double(bankManager.creditScore) * 100 // Simple calculation based on credit score
+                        Text("$\(Int(maxAmount).formattedWithSeparator())")
                             .fontWeight(.medium)
                     }
                     
@@ -1027,6 +1030,7 @@ struct BankingView: View {
         case .atmTransaction: return "building.columns"
         case .wireTransfer: return "network"
         case .investmentReturn: return "chart.line.uptrend.xyaxis"
+        @unknown default: return "questionmark.circle"
         }
     }
     
@@ -1042,6 +1046,8 @@ struct BankingView: View {
             return .purple
         case .loan:
             return .orange
+        @unknown default:
+            return .primary
         }
     }
     
@@ -1069,12 +1075,14 @@ struct BankingView: View {
     }
     
     func creditScoreCategoryColor() -> Color {
-        switch bankManager.creditScoreCategoryObject() {
-        case .poor: return .red
-        case .fair: return .orange
-        case .good: return .yellow
-        case .veryGood: return .green
-        case .excellent: return .blue
+        let category = bankManager.creditScoreCategory()
+        switch category {
+        case "Poor": return .red
+        case "Fair": return .orange
+        case "Good": return .yellow
+        case "Very Good": return .green
+        case "Excellent": return .blue
+        default: return .gray
         }
     }
 }
@@ -1147,7 +1155,9 @@ struct NewAccountView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Account Type")) {
+                Section {
+                    Text("Account Type")
+                        .font(.headline)
                     Picker("Select Account Type", selection: $selectedAccountType) {
                         ForEach(BankAccountType.allCases.filter { $0 != .mortgage && $0 != .autoLoan }, id: \.self) { type in
                             Text(type.rawValue).tag(type)
@@ -1160,7 +1170,9 @@ struct NewAccountView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                Section(header: Text("Initial Deposit")) {
+                Section {
+                    Text("Initial Deposit")
+                        .font(.headline)
                     TextField("Amount", text: $initialDeposit)
                         .keyboardType(.decimalPad)
                     
@@ -1170,7 +1182,9 @@ struct NewAccountView: View {
                 }
                 
                 if selectedAccountType == .cd || selectedAccountType == .loan {
-                    Section(header: Text("Term")) {
+                    Section {
+                        Text("Term")
+                            .font(.headline)
                         Stepper("\(term) \(term == 1 ? "Year" : "Years")", value: $term, in: 1...30)
                     }
                 }
@@ -1220,7 +1234,9 @@ struct TransferView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("From Account")) {
+                Section {
+                    Text("From Account")
+                        .font(.headline)
                     Picker("Select Account", selection: $fromAccountId) {
                         Text("Select Account").tag(nil as UUID?)
                         ForEach(bankManager.getActiveAccounts().filter { $0.balance > 0 }) { account in
@@ -1231,7 +1247,9 @@ struct TransferView: View {
                     .pickerStyle(MenuPickerStyle())
                 }
                 
-                Section(header: Text("To Account")) {
+                Section {
+                    Text("To Account")
+                        .font(.headline)
                     Picker("Select Account", selection: $toAccountId) {
                         Text("Select Account").tag(nil as UUID?)
                         ForEach(bankManager.getActiveAccounts().filter { account in
@@ -1245,7 +1263,9 @@ struct TransferView: View {
                     .pickerStyle(MenuPickerStyle())
                 }
                 
-                Section(header: Text("Amount")) {
+                Section {
+                    Text("Amount")
+                        .font(.headline)
                     TextField("Amount", text: $amount)
                         .keyboardType(.decimalPad)
                     
@@ -1300,6 +1320,18 @@ struct LoanApplicationView: View {
     var body: some View {
         NavigationView {
             Form {
+                Section {
+                    Picker("Select Loan Type", selection: $loanType) {
+                        Text("Personal Loan").tag(BankAccountType.loan)
+                        Text("Student Loan").tag(BankAccountType.studentLoan)
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    
+                    Text(loanType.description())
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
                 Section(header: Text("Loan Type")) {
                     Picker("Select Loan Type", selection: $loanType) {
                         Text("Personal Loan").tag(BankAccountType.loan)
@@ -1312,20 +1344,35 @@ struct LoanApplicationView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                Section(header: Text("Loan Details")) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Loan Details")
+                        .font(.headline)
+                        .padding(.bottom, 5)
+                        
                     TextField("Amount", text: $loanAmount)
                         .keyboardType(.decimalPad)
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
+                        .background(Color(UIColor.tertiarySystemBackground))
+                        .cornerRadius(8)
                     
-                    Text("Maximum: $\(Int(bankManager.maximumLoanAmount(loanType: loanType)).formattedWithSeparator())")
+                    Text("Maximum: $\(Int(calculateMaximumLoanAmount()).formattedWithSeparator())")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
                     Stepper("\(term) \(term == 1 ? "Year" : "Years")", value: $term, in: 1...30)
+                        .padding(.horizontal)
+                        .padding(.vertical, 5)
+                        .background(Color(UIColor.tertiarySystemBackground))
+                        .cornerRadius(8)
                     
                     Text("Estimated Interest Rate: \(loanType.defaultInterestRate() * 100, specifier: "%.2f")%")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+                .padding()
+                .background(Color(UIColor.secondarySystemBackground))
+                .cornerRadius(10)
                 
                 // Collateral selection for secured loans
                 if loanType == .loan && !bankManager.getAvailableCollateral().isEmpty {
@@ -1361,10 +1408,17 @@ struct LoanApplicationView: View {
         }
     }
     
+    private func calculateMaximumLoanAmount() -> Double {
+        // Simple calculation based on credit score
+        return Double(bankManager.creditScore) * 100
+    }
+    
     private func applyForLoan() {
         guard let amount = Double(loanAmount) else { return }
         
-        if bankManager.canQualifyForLoan(amount: amount, loanType: loanType) {
+        // Simple qualification logic based on credit score
+        let maxAmount = calculateMaximumLoanAmount()
+        if amount <= maxAmount {
             _ = bankManager.openAccount(
                 type: loanType,
                 initialDeposit: amount,

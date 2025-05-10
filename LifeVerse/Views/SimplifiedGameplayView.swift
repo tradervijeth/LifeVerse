@@ -550,7 +550,7 @@ struct SimplifiedGameplayView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
-                        Text("$\(Int(gameManager.calculateNetWorth()).formattedWithSeparator())")
+                        Text("$\(Int(gameManager.getBankingNetWorth()).formattedWithSeparator())")
                             .font(.title2)
                             .foregroundColor(.green)
                     }
@@ -647,7 +647,7 @@ struct SimplifiedGameplayView: View {
         .padding(.top)
     }
 
-    private func bankAccountCard(account: Banking_Account) -> some View {
+    private func bankAccountCard(account: BankAccount) -> some View {
         HStack {
             // Account icon
             Image(systemName: accountIcon(account.accountType))
@@ -846,7 +846,7 @@ struct SimplifiedGameplayView: View {
         return .red
     }
 
-    private func accountIcon(_ type: Banking_AccountType) -> String {
+    private func accountIcon(_ type: BankAccountType) -> String {
         switch type {
         case .checking: return "dollarsign.circle"
         case .savings: return "banknote"
@@ -859,10 +859,11 @@ struct SimplifiedGameplayView: View {
         case .studentLoan: return "book"
         case .businessAccount: return "briefcase"
         case .retirementAccount: return "leaf"
+        @unknown default: return "questionmark.circle"
         }
     }
 
-    private func accountColor(_ type: Banking_AccountType) -> Color {
+    private func accountColor(_ type: BankAccountType) -> Color {
         switch type {
         case .checking: return .blue
         case .savings: return .green
@@ -870,6 +871,7 @@ struct SimplifiedGameplayView: View {
         case .loan, .mortgage, .autoLoan, .studentLoan: return .red
         case .cd: return .orange
         case .investment, .businessAccount, .retirementAccount: return .indigo
+        @unknown default: return .gray
         }
     }
 
@@ -906,6 +908,9 @@ struct SimplifiedGameplayView: View {
             // Handle breakup
             gameManager.interactWithRelationship(at: index, interaction: .argue)
             gameManager.createEvent(title: "Relationship End", description: "You decided to end your relationship with \(relationship.name).", type: .relationship)
+        @unknown default:
+            gameManager.interactWithRelationship(at: index, interaction: .spendTime)
+            gameManager.createEvent(title: "Spending Time", description: "You spent time with \(relationship.name).", type: .relationship)
         }
     }
 }

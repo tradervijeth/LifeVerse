@@ -2,588 +2,684 @@
 //  BankManager.swift
 //  LifeVerse
 //
+//  Created by Vithushan Jeyapahan on 18/03/2025.
+//
 import Foundation
 import SwiftUI
-import Combine
 
-// Make BankManager conform to BankManagerProtocol for PropertyInvestment
 class BankManager: ObservableObject, BankManagerProtocol, Codable {
-    // Published properties
-    @Published var accounts: [Banking_Account] = []
-    @Published var loans: [Banking_Loan] = []
-    @Published var investments: [Banking_Investment] = []
-    @Published var transactionHistory: [Banking_Transaction] = []
-    @Published var collateralAssets: [Banking_CollateralAsset] = []
+    @Published var accounts: [BankAccount] = []
+    @Published var creditScore: Int = 650 // Starting credit score (300-850 range)
+    @Published var collateralAssets: [LoanCollateral] = []
+    @Published var marketCondition: MarketCondition = .normal // Current economic condition
+    @Published var transactionHistory: [BankTransaction] = [] // Global transaction history
     @Published var propertyInvestments: [PropertyInvestment] = []
     @Published var taxPaymentHistory: [TaxPayment] = []
     @Published var employmentHistory: [EmploymentRecord] = []
-
+    
     // Private properties
-    private var characterMoney: Double = 0
-    var characterBirthYear: Int = 0
-
-    // MARK: - Initialization
-
-    init() {
-        // Initialize with empty collections
-    }
-
-    // MARK: - Public Methods
-
-    // Get the character's money
+    private var _taxationSystem: TaxationSystem?
+    private var _employmentStatus: EmploymentStatus = .employed
+    
+    // Property to access character's money (to be set by GameManager)
+    public var characterMoney: Double = 0
+    public var characterBirthYear: Int = 0
+    
+    // Methods to get and set character money (for GameManager)
     func getCharacterMoney() -> Double {
         return characterMoney
     }
-
-    // Set the character's money
-    func setCharacterMoney(_ money: Double) {
-        characterMoney = money
+    
+    func setCharacterMoney(_ amount: Double) {
+        characterMoney = amount
+        objectWillChange.send()
     }
-
-    // Process yearly financial updates
+    
+    // Annual income tracking
+    public var annualIncome: Double = 0
+    
+    // Employment status enum
+    enum EmploymentStatus: String, Codable {
+        case employed = "Employed"
+        case unemployed = "Unemployed"
+        case selfEmployed = "Self-Employed"
+        case retired = "Retired"
+        case student = "Student"
+    }
+    
+    // Taxation system accessor
+    var taxationSystem: TaxationSystem {
+        get {
+            if _taxationSystem == nil {
+                _taxationSystem = TaxationSystem()
+            }
+            return _taxationSystem!
+        }
+        set {
+            _taxationSystem = newValue
+            objectWillChange.send()
+        }
+    }
+    
+    // Coding keys for Codable conformance
+    enum CodingKeys: String, CodingKey {
+        case accounts, creditScore, collateralAssets, marketCondition
+        case transactionHistory, propertyInvestments, taxPaymentHistory
+        case employmentHistory, characterMoney, characterBirthYear
+        case taxationSystem, employmentStatus, annualIncome
+    }
+    
+    // MARK: - Initialization and Codable Implementation
+    
+    init() {
+        // Initialize with empty collections
+    }
+    
+    required init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        accounts = try container.decode([BankAccount].self, forKey: .accounts)
+        creditScore = try container.decode(Int.self, forKey: .creditScore)
+        collateralAssets = try container.decode([LoanCollateral].self, forKey: .collateralAssets)
+        marketCondition = try container.decode(MarketCondition.self, forKey: .marketCondition)
+        transactionHistory = try container.decode([BankTransaction].self, forKey: .transactionHistory)
+        propertyInvestments = try container.decode([PropertyInvestment].self, forKey: .propertyInvestments)
+        // Decode tax payment history - safely handling potential type mismatches
+        do {
+            taxPaymentHistory = try container.decode([TaxPayment].self, forKey: .taxPaymentHistory)
+        } catch {
+            print("Failed to decode tax payment history: \(error)")
+            taxPaymentHistory = []
+        }
+        
+        // Decode employment history - safely handling potential type mismatches
+        do {
+            employmentHistory = try container.decode([EmploymentRecord].self, forKey: .employmentHistory)
+        } catch {
+            print("Failed to decode employment history: \(error)")
+            employmentHistory = []
+        }
+        characterMoney = try container.decode(Double.self, forKey: .characterMoney)
+        characterBirthYear = try container.decode(Int.self, forKey: .characterBirthYear)
+        annualIncome = try container.decodeIfPresent(Double.self, forKey: .annualIncome) ?? 0
+        
+        // Decode optional properties
+        _taxationSystem = try container.decodeIfPresent(TaxationSystem.self, forKey: .taxationSystem)
+        _employmentStatus = try container.decodeIfPresent(EmploymentStatus.self, forKey: .employmentStatus) ?? .employed
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(accounts, forKey: .accounts)
+        try container.encode(creditScore, forKey: .creditScore)
+        try container.encode(collateralAssets, forKey: .collateralAssets)
+        try container.encode(marketCondition, forKey: .marketCondition)
+        try container.encode(transactionHistory, forKey: .transactionHistory)
+        try container.encode(propertyInvestments, forKey: .propertyInvestments)
+        try container.encode(taxPaymentHistory, forKey: .taxPaymentHistory)
+        try container.encode(employmentHistory, forKey: .employmentHistory)
+        try container.encode(characterMoney, forKey: .characterMoney)
+        try container.encode(characterBirthYear, forKey: .characterBirthYear)
+        try container.encode(annualIncome, forKey: .annualIncome)
+        
+        try container.encodeIfPresent(_taxationSystem, forKey: .taxationSystem)
+        try container.encode(_employmentStatus, forKey: .employmentStatus)
+    }
+    
+    // MARK: - BankManagerProtocol Implementation
+    
+    // Account Management
+    func getAccounts() -> [BankAccount] {
+        return accounts
+    }
+    
+    func getActiveAccounts() -> [BankAccount] {
+        return accounts.filter { $0.isActive }
+    }
+    
+    func getAccount(id: UUID) -> BankAccount? {
+        return accounts.first { $0.id == id }
+    }
+    
+    func openAccount(type: BankAccountType, initialDeposit: Double, currentYear: Int, term: Int? = nil, collateralId: UUID? = nil) -> BankAccount? {
+        // Check if initial deposit meets minimum requirement
+        if initialDeposit < type.minimumInitialDeposit() {
+            return nil
+        }
+        
+        // Adjust interest rate based on market conditions
+        let interestRate = type.defaultInterestRate()
+        
+        // Create the account
+        var account = BankAccount(
+            accountType: type,
+            initialDeposit: initialDeposit,
+            interestRate: interestRate,
+            creationYear: currentYear
+        )
+        
+        // Set term if provided
+        if let term = term {
+            account.term = term
+        }
+        
+        // Add the account
+        accounts.append(account)
+        
+        // Add transaction record
+        let transactionType: BankTransactionType = (type == .loan || type == .mortgage || 
+                                                    type == .autoLoan || type == .studentLoan) ? 
+                                                    .loan : .deposit
+        
+        let transaction = BankTransaction(
+            type: transactionType,
+            amount: initialDeposit,
+            description: "Opened new \(type.rawValue) account",
+            date: Date(),
+            year: currentYear
+        )
+        transactionHistory.append(transaction)
+        
+        return account
+    }
+    
+    func closeAccount(accountId: UUID) -> (success: Bool, balance: Double) {
+        guard let index = accounts.firstIndex(where: { $0.id == accountId }) else {
+            return (false, 0)
+        }
+        
+        let account = accounts[index]
+        
+        // Can't close accounts with negative balance
+        if account.balance < 0 {
+            return (false, account.balance)
+        }
+        
+        // Mark as inactive instead of removing
+        accounts[index].isActive = false
+        
+        // Return the remaining balance
+        return (true, account.balance)
+    }
+    
+    // Transaction Operations
+    func deposit(accountId: UUID, amount: Double) -> Bool {
+        guard let index = accounts.firstIndex(where: { $0.id == accountId }) else {
+            return false
+        }
+        
+        // Try to deposit
+        let success = accounts[index].deposit(amount: amount)
+        
+        // Add to transaction history
+        if success {
+            let transaction = BankTransaction(
+                type: .deposit,
+                amount: amount,
+                description: "Deposit to \(accounts[index].accountType.rawValue)",
+                date: Date(),
+                year: Calendar.current.component(.year, from: Date())
+            )
+            transactionHistory.append(transaction)
+        }
+        
+        return success
+    }
+    
+    func withdraw(accountId: UUID, amount: Double) -> Bool {
+        guard let index = accounts.firstIndex(where: { $0.id == accountId }) else {
+            return false
+        }
+        
+        // Try to withdraw
+        let success = accounts[index].withdraw(amount: amount)
+        
+        // Add to transaction history
+        if success {
+            let transaction = BankTransaction(
+                type: .withdrawal,
+                amount: amount,
+                description: "Withdrawal from \(accounts[index].accountType.rawValue)",
+                date: Date(),
+                year: Calendar.current.component(.year, from: Date())
+            )
+            transactionHistory.append(transaction)
+        }
+        
+        return success
+    }
+    
+    func transfer(fromAccountId: UUID, toAccountId: UUID, amount: Double) -> Bool {
+        guard let fromIndex = accounts.firstIndex(where: { $0.id == fromAccountId }),
+              let toIndex = accounts.firstIndex(where: { $0.id == toAccountId }) else {
+            return false
+        }
+        
+        // Check if withdrawal is possible
+        if accounts[fromIndex].withdraw(amount: amount) {
+            // Deposit to receiving account
+            let success = accounts[toIndex].deposit(amount: amount)
+            if success {
+                // Add transaction record
+                let transaction = BankTransaction(
+                    type: .transfer,
+                    amount: amount,
+                    description: "Transfer from \(accounts[fromIndex].accountType.rawValue) to \(accounts[toIndex].accountType.rawValue)",
+                    date: Date(),
+                    year: Calendar.current.component(.year, from: Date())
+                )
+                transactionHistory.append(transaction)
+                return true
+            } else {
+                // Rollback if deposit failed
+                let _ = accounts[fromIndex].deposit(amount: amount)
+            }
+        }
+        return false
+    }
+    
+    func makeLoanPayment(loanId: UUID, amount: Double) -> Bool {
+        guard let index = accounts.firstIndex(where: { $0.id == loanId }) else {
+            return false
+        }
+        
+        // Make payment
+        let success = accounts[index].makePayment(amount: amount)
+        
+        // Add transaction record
+        if success {
+            let transaction = BankTransaction(
+                type: .payment,
+                amount: amount,
+                description: "Payment to \(accounts[index].accountType.rawValue)",
+                date: Date(),
+                year: Calendar.current.component(.year, from: Date())
+            )
+            transactionHistory.append(transaction)
+            
+            // Update credit score for on-time payments
+            adjustCreditScore(change: 3)
+        }
+        
+        return success
+    }
+    
+    // Credit and Financial Status
+    func adjustCreditScore(change: Int) {
+        creditScore = max(300, min(850, creditScore + change))
+    }
+    
+    func creditScoreCategory() -> String {
+        switch creditScore {
+        case 300...579: return "Poor"
+        case 580...669: return "Fair"
+        case 670...739: return "Good"
+        case 740...799: return "Very Good"
+        case 800...850: return "Excellent"
+        default: return "Unknown"
+        }
+    }
+    
+    func calculateNetWorth() -> Double {
+        var netWorth = characterMoney
+        
+        // Add account balances
+        for account in accounts where account.isActive {
+            netWorth += account.balance
+        }
+        
+        // Add property values
+        for property in propertyInvestments {
+            netWorth += property.currentValue
+            
+            // Subtract mortgage balance if present
+            if let mortgageId = property.mortgageAccountId,
+               let mortgage = getAccount(id: mortgageId) {
+                netWorth += mortgage.balance // Will subtract since mortgage balance is negative
+            }
+        }
+        
+        // Add collateral assets
+        for asset in collateralAssets {
+            // Only add if not already counted as part of property
+            if asset.loanId == nil {
+                netWorth += asset.value
+            }
+        }
+        
+        return netWorth
+    }
+    
+    func getTotalDebt() -> Double {
+        var totalDebt = 0.0
+        
+        // Add negative balances from accounts
+        for account in accounts where account.isActive && account.balance < 0 {
+            totalDebt += abs(account.balance)
+        }
+        
+        return totalDebt
+    }
+    
+    func getTotalSavings() -> Double {
+        var totalSavings = 0.0
+        
+        // Add positive balances from savings-type accounts
+        for account in accounts where account.isActive && account.balance > 0 &&
+            (account.accountType == .savings || account.accountType == .checking || 
+             account.accountType == .cd || account.accountType == .retirementAccount) {
+            totalSavings += account.balance
+        }
+        
+        return totalSavings
+    }
+    
+    func requestCreditReport() -> [String: Any] {
+        // Calculate debt-to-income ratio
+        let totalDebt = getTotalDebt()
+        let debtToIncomeRatio = totalDebt / 50000.0 // Assuming $50k annual income
+        
+        // Generate report
+        return [
+            "creditScore": creditScore,
+            "category": creditScoreCategory(),
+            "accounts": accounts.count,
+            "activeAccounts": getActiveAccounts().count,
+            "totalDebt": totalDebt,
+            "debtToIncomeRatio": debtToIncomeRatio,
+            "creditUtilization": calculateCreditUtilization()
+        ]
+    }
+    
+    // Calculate credit utilization (credit used / total available credit)
+    func calculateCreditUtilization() -> Double {
+        var totalCreditLimit: Double = 0
+        var totalCreditUsed: Double = 0
+        
+        for account in accounts where account.isActive && account.accountType == .creditCard {
+            // Credit limit is stored as part of the account object
+            let creditLimit = account.creditLimit > 0 ? account.creditLimit : 1000 // Default if not set
+            totalCreditLimit += creditLimit
+            
+            // Credit used is the negative balance (credit cards have negative balances when used)
+            if account.balance < 0 {
+                totalCreditUsed += abs(account.balance)
+            }
+        }
+        
+        // Avoid division by zero
+        if totalCreditLimit <= 0 {
+            return 0.0
+        }
+        
+        // Return as percentage (0-1)
+        return totalCreditUsed / totalCreditLimit
+    }
+    
+    // Collateral Management
+    func addCollateralAsset(type: CollateralType, description: String, value: Double, purchaseYear: Int) -> LoanCollateral {
+        let collateral = LoanCollateral(
+            type: type,
+            description: description,
+            value: value,
+            purchaseYear: purchaseYear
+        )
+        collateralAssets.append(collateral)
+        return collateral
+    }
+    
+    func getAvailableCollateral() -> [LoanCollateral] {
+        return collateralAssets.filter { $0.loanId == nil }
+    }
+    
+    func getCollateral(forLoanId loanId: UUID) -> LoanCollateral? {
+        return collateralAssets.first { $0.loanId == loanId }
+    }
+    
+    // MARK: - Employment Status Management
+    
+    // Public accessor for employment status
+    var employmentStatus: EmploymentStatus {
+        return _employmentStatus
+    }
+    
+    // Method to update employment status - for use by extensions
+    func updateEmploymentStatus(_ status: EmploymentStatus) {
+        _employmentStatus = status
+        objectWillChange.send()
+    }
+    
+    // MARK: - Additional Methods
+    
+    // Process yearly updates
     func processYearlyUpdate(currentYear: Int) -> [LifeEvent] {
         var events: [LifeEvent] = []
-
+        
         // Process accounts
-        for i in 0..<accounts.count {
-            if accounts[i].isActive {
-                // Apply interest to accounts
-                let interestEarned = applyInterestToAccount(index: i, currentYear: currentYear)
-
+        for i in 0..<accounts.count where accounts[i].isActive {
+            // Apply interest
+            let interest = accounts[i].applyYearlyInterest()
+            
+            if abs(interest) > 1.0 {
                 // Create interest event if significant
-                if interestEarned > 0.01 {
-                    let interestEvent = LifeEvent(
-                        title: "Account Interest",
-                        description: "You earned interest on your \(accounts[i].accountType.rawValue).",
-                        type: .financial,
-                        year: currentYear,
-                        outcome: "You earned $\(Int(interestEarned).formattedWithSeparator()) in interest.",
-                        effects: []
-                    )
-                    events.append(interestEvent)
-                }
-            }
-        }
-
-        // Process loans
-        for i in 0..<loans.count {
-            if !loans[i].isClosed {
-                // Apply interest to loans
-                let interestAccrued = applyInterestToLoan(index: i, currentYear: currentYear)
-
-                // Create interest event if significant
-                if interestAccrued > 0.01 {
-                    let interestEvent = LifeEvent(
-                        title: "Loan Interest",
-                        description: "Interest accrued on your \(loans[i].type.rawValue).",
-                        type: .financial,
-                        year: currentYear,
-                        outcome: "Your loan accrued $\(Int(interestAccrued).formattedWithSeparator()) in interest.",
-                        effects: []
-                    )
-                    events.append(interestEvent)
-                }
-            }
-        }
-
-        // Update investments based on market conditions
-        let bankingMarketCondition = Banking_MarketCondition.currentYear() == currentYear ?
-                                     Banking_MarketCondition.normal : getMarketConditionForYear(currentYear)
-
-        for i in 0..<investments.count {
-            let valueChange = updateInvestmentValue(index: i, currentYear: currentYear, marketCondition: bankingMarketCondition)
-
-            // Create investment event if significant change
-            if abs(valueChange) > 0.01 {
-                let changeDirection = valueChange > 0 ? "increased" : "decreased"
-                let investmentEvent = LifeEvent(
-                    title: "Investment Update",
-                    description: "Your \(investments[i].name) \(changeDirection) in value.",
+                let eventTitle = accounts[i].balance > 0 ? "Interest Earned" : "Interest Charged"
+                let eventDescription = accounts[i].balance > 0 
+                    ? "You earned interest on your \(accounts[i].accountType.rawValue)."
+                    : "Interest was charged on your \(accounts[i].accountType.rawValue)."
+                
+                let interestEvent = LifeEvent(
+                    title: eventTitle,
+                    description: eventDescription,
                     type: .financial,
                     year: currentYear,
-                    outcome: "Value change: $\(Int(valueChange).formattedWithSeparator()).",
-                    effects: []
+                    outcome: "Amount: $\(Int(abs(interest))).",
+                    effects: [EventChoice.CharacterEffect(attribute: "money", change: Int(interest))]
                 )
-                events.append(investmentEvent)
+                events.append(interestEvent)
+            }
+            
+            // Apply monthly fees (12 months)
+            let yearlyFees = accounts[i].applyMonthlyFee() * 12
+            if yearlyFees > 0 {
+                let feeEvent = LifeEvent(
+                    title: "Account Fees",
+                    description: "You paid fees on your \(accounts[i].accountType.rawValue).",
+                    type: .financial,
+                    year: currentYear,
+                    outcome: "Total fees: $\(Int(yearlyFees)).",
+                    effects: [EventChoice.CharacterEffect(attribute: "money", change: -Int(yearlyFees))]
+                )
+                events.append(feeEvent)
             }
         }
-
-        // Update property values based on market conditions
+        
+        // Update properties
         for i in 0..<propertyInvestments.count {
-            let valueChange = propertyInvestments[i].updateValue(currentYear: currentYear, marketCondition: bankingMarketCondition)
-
-            // Create property event if significant change
+            let valueChange = propertyInvestments[i].updateValue(currentYear: currentYear, marketCondition: marketCondition)
+            
             if abs(valueChange) > 1000 {
+                // Create property value change event if significant
                 let changeDirection = valueChange > 0 ? "increased" : "decreased"
                 let propertyEvent = LifeEvent(
                     title: "Property Value Change",
                     description: "Your property \(changeDirection) in value.",
                     type: .financial,
                     year: currentYear,
-                    outcome: "Value change: $\(Int(valueChange).formattedWithSeparator()).",
+                    outcome: "Change: $\(Int(valueChange)).",
                     effects: []
                 )
                 events.append(propertyEvent)
             }
-
-            // Calculate and add rental income if applicable
-            if propertyInvestments[i].isRental && propertyInvestments[i].monthlyRent > 0 {
-                let annualRent = propertyInvestments[i].calculateAnnualRentalIncome()
-
-                // Add rental income to character's money
-                characterMoney += annualRent
-
-                // Add MONTHLY rental income transaction for reporting purposes
-                let monthlyRent = propertyInvestments[i].monthlyRent * propertyInvestments[i].occupancyRate
-                let monthlyTransaction = Banking_Transaction(
-                    date: Date(),
-                    type: .deposit,
-                    amount: monthlyRent,
-                    description: "Rental income from Rental Property",
-                    year: currentYear
-                )
-                transactionHistory.append(monthlyTransaction)
-
-                // Create a transaction record for ANNUAL rental income (for summary purposes)
-                let rentalTransaction = Banking_Transaction(
-                    date: Date(),
-                    type: .deposit,
-                    amount: annualRent,
-                    description: "Annual rental income from property",
-                    year: currentYear
-                )
-                transactionHistory.append(rentalTransaction)
-
-                // Create rental income event
+            
+            // Process rental income if applicable
+            if propertyInvestments[i].isRental {
+                let rentalIncome = propertyInvestments[i].calculateAnnualRentalIncome()
+                characterMoney += rentalIncome
+                
                 let rentalEvent = LifeEvent(
                     title: "Rental Income",
-                    description: "You collected rent from your investment property.",
+                    description: "You collected rent from your property.",
                     type: .financial,
                     year: currentYear,
-                    outcome: "Annual rental income: $\(Int(annualRent).formattedWithSeparator()).",
-                    effects: [EventChoice.CharacterEffect(attribute: "money", change: Int(annualRent))]
+                    outcome: "Total income: $\(Int(rentalIncome)).",
+                    effects: [EventChoice.CharacterEffect(attribute: "money", change: Int(rentalIncome))]
                 )
                 events.append(rentalEvent)
             }
         }
-
+        
         return events
     }
-
-    // Helper method to apply interest to an account
-    private func applyInterestToAccount(index: Int, currentYear: Int) -> Double {
-        // Placeholder for account interest calculation
-        return 0.0
-    }
-
-    // Helper method to apply interest to a loan
-    private func applyInterestToLoan(index: Int, currentYear: Int) -> Double {
-        // Placeholder for loan interest calculation
-        return 0.0
-    }
-
-    // Helper method to update investment value
-    private func updateInvestmentValue(index: Int, currentYear: Int, marketCondition: Banking_MarketCondition) -> Double {
-        // Placeholder for investment value update
-        return 0.0
-    }
-
-    // Get market condition for a specific year
-    private func getMarketConditionForYear(_ year: Int) -> Banking_MarketCondition {
-        // Simple algorithm to generate market conditions
-        let baseValue = year % 7
-        switch baseValue {
-        case 0: return .depression
-        case 1: return .recession
-        case 2, 3: return .recovery
-        case 4: return .normal
-        case 5: return .expansion
-        case 6: return .boom
-        default: return .normal
-        }
-    }
-
-    // Get active accounts
-    func getActiveAccounts() -> [Banking_Account] {
-        return accounts.filter { $0.isActive }
-    }
-
-    // Get specific account by ID
-    func getAccount(id: UUID) -> Banking_Account? {
-        return accounts.first { $0.id == id }
-    }
-
-    // Convert a property to a rental
-    func convertPropertyToRental(propertyId: UUID, monthlyRent: Double, occupancyRate: Double) -> Bool {
-        // Find the property
-        guard let index = propertyInvestments.firstIndex(where: { $0.id == propertyId }) else {
-            return false
-        }
-
-        // Update the property
-        var property = propertyInvestments[index]
-        property.isRental = true
-        property.monthlyRent = monthlyRent
-        property.occupancyRate = occupancyRate
-
-        // Update the property in the collection
-        propertyInvestments[index] = property
-
-        // Create a transaction record
-        let transaction = Banking_Transaction(
-            date: Date(),
-            type: .specialEvent,
-            amount: 0,
-            description: "Converted property to rental with monthly rent of $\(Int(monthlyRent))",
-            year: Calendar.current.component(.year, from: Date())
-        )
-        transactionHistory.append(transaction)
-
-        return true
-    }
-
-    // Open a new account
-    @discardableResult
-    func openAccount(type: Banking_AccountType, initialDeposit: Double, loanAmount: Double = 0, term: Int = 0) -> Banking_Account? {
-        let interest = getBaseInterestRate(for: type) + Double.random(in: -0.005...0.005)
-        var account = Banking_Account(
-            accountType: type,
-            balance: type == .mortgage ? 0 : initialDeposit,
-            interestRate: interest,
-            term: term,
-            creationYear: Calendar.current.component(.year, from: Date())
-        )
-
-        // For mortgage accounts, set up the correct structure
-        if type == .mortgage {
-            // Set the balance to negative to represent debt
-            account.balance = -abs(initialDeposit)
-
-            // Create loan transaction for the mortgage
-            let transaction = Banking_Transaction(
-                date: Date(),
-                type: .loan,
-                amount: initialDeposit,
-                description: "Mortgage loan disbursement",
-                year: Calendar.current.component(.year, from: Date())
-            )
-            account.transactions.append(transaction)
-        } else {
-            // For non-mortgage accounts, deduct the deposit from character money
-            if initialDeposit > 0 {
-                if characterMoney >= initialDeposit {
-                    characterMoney -= initialDeposit
-                } else {
-                    // Not enough money
-                    return nil
-                }
-            }
-        }
-
-        accounts.append(account)
-
-        return account
-    }
-
-    // Get base interest rate for account type
-    private func getBaseInterestRate(for accountType: Banking_AccountType) -> Double {
-        switch accountType {
-        case .checking: return 0.0025 // 0.25%
-        case .savings: return 0.01 // 1%
-        case .cd: return 0.025 // 2.5%
-        case .mortgage: return 0.045 // 4.5%
-        case .loan: return 0.08 // 8%
-        case .creditCard: return 0.18 // 18%
-        case .investment: return 0.0 // Variable returns
-        case .autoLoan: return 0.045 // 4.5%
-        case .studentLoan: return 0.04 // 4%
-        case .businessAccount: return 0.015 // 1.5%
-        case .retirementAccount: return 0.0 // Variable returns
-        }
-    }
-
-    // Deposit money to an account
-    func deposit(accountId: UUID, amount: Double) -> Bool {
-        guard amount > 0 else { return false }
-
-        // Find the account
-        if let index = accounts.firstIndex(where: { $0.id == accountId }) {
-            if accounts[index].isActive {
-                // Ensure character has enough money
-                if characterMoney >= amount {
-                    // Call deposit method on the account
-                    let success = depositToAccount(index: index, amount: amount)
-                    if success {
-                        characterMoney -= amount
-
-                        // Add transaction
-                        let transaction = Banking_Transaction(
-                            date: Date(),
-                            type: .deposit,
-                            amount: amount,
-                            description: "Deposit to \(accounts[index].accountType.rawValue)",
-                            year: Calendar.current.component(.year, from: Date())
-                        )
-                        transactionHistory.append(transaction)
-                        return true
-                    }
-                }
-            }
-        }
-        return false
-    }
-
-    // Helper method to deposit to an account
-    private func depositToAccount(index: Int, amount: Double) -> Bool {
-        // Placeholder for account deposit implementation
-        return true
-    }
-
-    // Withdraw money from an account
-    func withdraw(accountId: UUID, amount: Double) -> Bool {
-        guard amount > 0 else { return false }
-
-        // Find the account
-        if let index = accounts.firstIndex(where: { $0.id == accountId }) {
-            if accounts[index].isActive {
-                // Call withdraw method on the account
-                let success = withdrawFromAccount(index: index, amount: amount)
-                if success {
-                    characterMoney += amount
-
-                    // Add transaction
-                    let transaction = Banking_Transaction(
-                        date: Date(),
-                        type: .withdrawal,
-                        amount: amount,
-                        description: "Withdrawal from \(accounts[index].accountType.rawValue)",
-                        year: Calendar.current.component(.year, from: Date())
+    
+    // Generate random banking events
+    func generateRandomBankingEvents(currentYear: Int) -> [LifeEvent] {
+        var events: [LifeEvent] = []
+        
+        // Random chance for banking events
+        let eventChance = Double.random(in: 0...1)
+        
+        if eventChance < 0.3 { // 30% chance for a banking event
+            // Choose a random event type
+            let eventType = Int.random(in: 0...3)
+            
+            switch eventType {
+            case 0: // Bank fee
+                if accounts.first(where: { $0.isActive && 
+                    ($0.accountType == .checking || $0.accountType == .savings) }) != nil {
+                    
+                    let feeAmount = Double.random(in: 10...50)
+                    let feeTypes = ["Overdraft", "Service", "ATM", "Foreign Transaction"]
+                    let feeType = feeTypes.randomElement() ?? "Service"
+                    
+                    let feeEvent = LifeEvent(
+                        title: "Bank Fee",
+                        description: "Your bank charged you a $\(Int(feeAmount)) \(feeType) fee.",
+                        type: .financial,
+                        year: currentYear,
+                        outcome: "Your account was debited.",
+                        effects: [EventChoice.CharacterEffect(attribute: "money", change: -Int(feeAmount))]
                     )
-                    transactionHistory.append(transaction)
-                    return true
+                    events.append(feeEvent)
                 }
+                
+            case 1: // Bank promotion
+                let promotionAmount = Double.random(in: 50...200)
+                
+                let promotionEvent = LifeEvent(
+                    title: "Bank Promotion",
+                    description: "Your bank is offering a $\(Int(promotionAmount)) bonus for opening a new account.",
+                    type: .financial,
+                    year: currentYear,
+                    choices: [
+                        EventChoice(
+                            text: "Open a new checking account",
+                            outcome: "You opened a new checking account and received the bonus.",
+                            effects: [EventChoice.CharacterEffect(attribute: "money", change: Int(promotionAmount))]
+                        ),
+                        EventChoice(
+                            text: "Open a new savings account",
+                            outcome: "You opened a new savings account and received the bonus.",
+                            effects: [EventChoice.CharacterEffect(attribute: "money", change: Int(promotionAmount))]
+                        ),
+                        EventChoice(
+                            text: "Ignore the offer",
+                            outcome: "You decided not to open a new account.",
+                            effects: []
+                        )
+                    ]
+                )
+                events.append(promotionEvent)
+                
+            case 2: // Interest rate change
+                let isIncrease = Bool.random()
+                let changeAmount = Double.random(in: 0.005...0.02) // 0.5% to 2%
+                
+                let changeType = isIncrease ? "increased" : "decreased"
+                let changeEffect = isIncrease ? "This is good for savings but bad for loans." : 
+                                              "This is bad for savings but good for loans."
+                
+                let rateEvent = LifeEvent(
+                    title: "Interest Rate Change",
+                    description: "The Federal Reserve has \(changeType) interest rates by \(String(format: "%.1f", changeAmount * 100))%. \(changeEffect)",
+                    type: .financial,
+                    year: currentYear,
+                    outcome: "Your account interest rates have been adjusted.",
+                    effects: []
+                )
+                events.append(rateEvent)
+                
+            case 3: // Credit score change
+                let isImproved = Bool.random()
+                let changeAmount = Int.random(in: 5...25)
+                
+                let changeDirection = isImproved ? "improved" : "decreased"
+                let changeEffect = isImproved ? 
+                    "This will help you get better loan rates in the future." :
+                    "This might make future loans more expensive."
+                
+                // Adjust credit score
+                adjustCreditScore(change: isImproved ? changeAmount : -changeAmount)
+                
+                let creditEvent = LifeEvent(
+                    title: "Credit Score Change",
+                    description: "Your credit score has \(changeDirection) by \(changeAmount) points.",
+                    type: .financial,
+                    year: currentYear,
+                    outcome: "\(changeEffect) Your new credit score is \(creditScore) (\(creditScoreCategory())).",
+                    effects: []
+                )
+                events.append(creditEvent)
+                
+            default:
+                break
             }
         }
-        return false
+        
+        return events
     }
-
-    // Helper method to withdraw from an account
-    private func withdrawFromAccount(index: Int, amount: Double) -> Bool {
-        // Placeholder for account withdrawal implementation
-        return true
+    
+    // Get current market condition
+    func getCurrentMarketCondition() -> Banking_MarketCondition {
+        // Convert from MarketCondition to Banking_MarketCondition
+        switch marketCondition {
+        case .depression: return .depression
+        case .recession: return .recession
+        case .recovery: return .recovery
+        case .normal: return .normal
+        case .expansion: return .expansion
+        case .boom: return .boom
+        }
     }
-
-    // Add collateral asset
-    @discardableResult
-    func addCollateralAsset(type: Banking_CollateralType, description: String, value: Double, purchaseYear: Int) -> Banking_CollateralAsset {
-        let asset = Banking_CollateralAsset(
-            type: type,
-            description: description,
-            value: value,
-            purchaseYear: purchaseYear
+    
+    // Create a mortgage
+    func createMortgage(propertyValue: Double, downPayment: Double, term: Int, currentYear: Int) -> (success: Bool, mortgage: BankAccount?) {
+        // Minimum down payment is 5% of property value
+        let minimumDownPayment = propertyValue * 0.05
+        if downPayment < minimumDownPayment {
+            return (false, nil)
+        }
+        
+        // Check if character has enough money
+        if characterMoney < downPayment {
+            return (false, nil)
+        }
+        
+        // Loan amount is property value minus down payment
+        let loanAmount = propertyValue - downPayment
+        
+        // Create the mortgage account
+        let mortgage = openAccount(
+            type: .mortgage,
+            initialDeposit: loanAmount,
+            currentYear: currentYear,
+            term: term
         )
-        collateralAssets.append(asset)
-        return asset
-    }
-
-    // Get property investments
-    func getPropertyInvestments() -> [PropertyInvestment] {
-        return propertyInvestments
-    }
-
-    // Create a new investment
-    @discardableResult
-    func makeInvestment(type: Banking_InvestmentType, name: String, amount: Double, riskLevel: Banking_RiskLevel) -> Banking_Investment? {
-        // Check if there's enough money
-        if characterMoney < amount {
-            return nil
+        
+        if let mortgage = mortgage {
+            // Deduct down payment
+            characterMoney -= downPayment
+            return (true, mortgage)
         }
-
-        // Create the investment object
-        var investment = Banking_Investment(
-            type: type,
-            name: name,
-            initialValue: amount,
-            purchaseYear: Calendar.current.component(.year, from: Date()),
-            riskLevel: riskLevel
-        )
-
-        // Deduct from character's money
-        characterMoney -= amount
-
-        // Create an investment account if needed
-        let account = openAccount(type: .investment, initialDeposit: amount)
-        if let account = account {
-            investment.accountId = account.id
-        }
-
-        // Add to investments collection
-        investments.append(investment)
-
-        // Create transaction record
-        let transaction = Banking_Transaction(
-            date: Date(),
-            type: .investment,
-            amount: amount,
-            description: "Investment in \(name)",
-            year: Calendar.current.component(.year, from: Date())
-        )
-        transactionHistory.append(transaction)
-
-        return investment
-    }
-
-    // Calculate net worth
-    func calculateNetWorth(currentYear: Int) -> Double {
-        var netWorth: Double = 0
-
-        // Add character's cash
-        netWorth += characterMoney
-
-        // Add bank account balances (only positive balances)
-        for account in accounts where account.isActive {
-            if account.balance > 0 {
-                netWorth += account.balance
-            }
-        }
-
-        // Add investment values
-        for investment in investments {
-            netWorth += investment.currentValue
-        }
-
-        // Add property equity (value minus mortgage) instead of full value
-        netWorth += calculateTotalPropertyEquity(currentYear: currentYear)
-
-        // Add other loans/debts (excluding mortgages which are already accounted for in property equity)
-        for account in accounts where account.isActive &&
-            account.accountType != .mortgage &&
-            account.balance < 0 {
-            netWorth += account.balance // Adding because loan balances are stored as negative
-        }
-
-        return netWorth
-    }
-
-    // MARK: - Taxation methods
-
-    // Calculate income tax
-    func calculateIncomeTax(currentYear: Int) -> Double {
-        // Get total income for the year
-        var totalIncome: Double = 0
-
-        // Add employment income
-        for record in employmentHistory where getYearFromDate(record.date) == currentYear {
-            totalIncome += record.income
-        }
-
-        // Simple progressive tax calculation
-        var tax: Double = 0
-
-        if totalIncome <= 10000 {
-            tax = totalIncome * 0.10
-        } else if totalIncome <= 40000 {
-            tax = 1000 + (totalIncome - 10000) * 0.15
-        } else if totalIncome <= 85000 {
-            tax = 5500 + (totalIncome - 40000) * 0.25
-        } else if totalIncome <= 163000 {
-            tax = 16750 + (totalIncome - 85000) * 0.28
-        } else if totalIncome <= 207000 {
-            tax = 38590 + (totalIncome - 163000) * 0.33
-        } else {
-            tax = 53090 + (totalIncome - 207000) * 0.37
-        }
-
-        return tax
-    }
-
-    // Calculate property tax
-    func calculatePropertyTax(currentYear: Int) -> Double {
-        var totalPropertyTax: Double = 0
-
-        // Calculate property tax for each property
-        for property in propertyInvestments {
-            let propertyTax = property.currentValue * property.propertyTaxRate
-            totalPropertyTax += propertyTax
-        }
-
-        return totalPropertyTax
-    }
-
-    // Calculate capital gains tax
-    func calculateCapitalGainsTax(currentYear: Int) -> Double {
-        var totalCapitalGains: Double = 0
-
-        // Calculate capital gains from selling investments
-        for transaction in transactionHistory
-            where transaction.type.rawValue == "Investment Return" && getYearFromDate(transaction.date) == currentYear {
-            // Simple approximation - assuming 15% of sale amount is capital gains
-            let capitalGains = transaction.amount * 0.15
-            totalCapitalGains += capitalGains
-        }
-
-        // Calculate tax rate (simplified)
-        let taxRate = 0.15 // 15% capital gains tax rate
-
-        return totalCapitalGains * taxRate
-    }
-
-    // Calculate interest income tax
-    func calculateInterestIncomeTax(currentYear: Int) -> Double {
-        var totalInterestIncome: Double = 0
-
-        // Calculate interest income from accounts
-        for transaction in transactionHistory
-            where transaction.type == .interest && getYearFromDate(transaction.date) == currentYear {
-            totalInterestIncome += transaction.amount
-        }
-
-        // Use the same income tax rate
-        let taxRate = 0.25 // 25% tax rate
-
-        return totalInterestIncome * taxRate
-    }
-
-    // Get year from date helper
-    private func getYearFromDate(_ date: Date) -> Int {
-        return Calendar.current.component(.year, from: date)
-    }
-
-    // MARK: - Codable Implementation
-
-    enum CodingKeys: String, CodingKey {
-        case accounts, loans, investments, transactionHistory, collateralAssets
-        case propertyInvestments, taxPaymentHistory, employmentHistory
-        case characterMoney, characterBirthYear
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-
-        try container.encode(accounts, forKey: .accounts)
-        try container.encode(loans, forKey: .loans)
-        try container.encode(investments, forKey: .investments)
-        try container.encode(transactionHistory, forKey: .transactionHistory)
-        try container.encode(collateralAssets, forKey: .collateralAssets)
-        try container.encode(propertyInvestments, forKey: .propertyInvestments)
-        try container.encode(taxPaymentHistory, forKey: .taxPaymentHistory)
-        try container.encode(employmentHistory, forKey: .employmentHistory)
-        try container.encode(characterMoney, forKey: .characterMoney)
-        try container.encode(characterBirthYear, forKey: .characterBirthYear)
-    }
-
-    required init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-
-        accounts = try container.decode([Banking_Account].self, forKey: .accounts)
-        loans = try container.decode([Banking_Loan].self, forKey: .loans)
-        investments = try container.decode([Banking_Investment].self, forKey: .investments)
-        transactionHistory = try container.decode([Banking_Transaction].self, forKey: .transactionHistory)
-        collateralAssets = try container.decode([Banking_CollateralAsset].self, forKey: .collateralAssets)
-        propertyInvestments = try container.decode([PropertyInvestment].self, forKey: .propertyInvestments)
-        taxPaymentHistory = try container.decode([TaxPayment].self, forKey: .taxPaymentHistory)
-        employmentHistory = try container.decode([EmploymentRecord].self, forKey: .employmentHistory)
-        characterMoney = try container.decode(Double.self, forKey: .characterMoney)
-        characterBirthYear = try container.decode(Int.self, forKey: .characterBirthYear)
+        
+        return (false, nil)
     }
 }

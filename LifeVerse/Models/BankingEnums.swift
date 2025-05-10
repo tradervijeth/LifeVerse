@@ -112,6 +112,7 @@ enum BankTransactionType: String, Codable {
     case atmTransaction = "ATM Transaction"
     case wireTransfer = "Wire Transfer"
     case investmentReturn = "Investment Return"
+    case cashOut = "Cash-Out Refinance" // Added for property refinancing
     
     // Get a description of the transaction type
     func description() -> String {
@@ -146,100 +147,20 @@ enum BankTransactionType: String, Codable {
             return "Electronic funds transfer"
         case .investmentReturn:
             return "Return on investment"
+        case .cashOut:
+            return "Cash received from property refinancing"
         }
     }
 }
 
-// Market conditions that affect investment returns and interest rates
-enum MarketCondition: String, Codable {
-    case recession = "Recession"
-    case depression = "Depression"
-    case recovery = "Recovery"
-    case expansion = "Expansion"
-    case boom = "Boom"
-    
-    // Get the effect on interest rates
-    func interestRateEffect() -> Double {
-        switch self {
-        case .recession: return -0.02 // -2%
-        case .depression: return -0.03 // -3%
-        case .recovery: return 0.01 // +1%
-        case .expansion: return 0.02 // +2%
-        case .boom: return 0.03 // +3%
-        }
-    }
-    
-    // Get the effect on investment returns
-    func investmentReturnEffect() -> (min: Double, max: Double) {
-        switch self {
-        case .recession: return (min: -0.25, max: 0.05) // -25% to +5%
-        case .depression: return (min: -0.40, max: 0.0) // -40% to 0%
-        case .recovery: return (min: -0.10, max: 0.15) // -10% to +15%
-        case .expansion: return (min: -0.05, max: 0.20) // -5% to +20%
-        case .boom: return (min: 0.0, max: 0.30) // 0% to +30%
-        }
-    }
-    
-    // Get description of market condition
-    func description() -> String {
-        switch self {
-        case .recession:
-            return "The economy is contracting with rising unemployment and falling stock prices."
-        case .depression:
-            return "A severe and prolonged downturn in economic activity."
-        case .recovery:
-            return "The economy is beginning to grow again after a downturn."
-        case .expansion:
-            return "The economy is growing steadily with increasing employment and rising stock prices."
-        case .boom:
-            return "A period of rapid economic growth and prosperity."
-        }
-    }
-}
+// Type reference to the market condition enum
+// This is now directly defined in Models/MarketCondition.swift
+// typealias MarketCondition = Banking_MarketCondition
 
-// Credit score categories
-enum CreditScoreCategory: String, Codable {
-    case poor = "Poor"
-    case fair = "Fair"
-    case good = "Good"
-    case veryGood = "Very Good"
-    case excellent = "Excellent"
-    
-    // Get the range for this credit score category
-    func range() -> ClosedRange<Int> {
-        switch self {
-        case .poor: return 300...579
-        case .fair: return 580...669
-        case .good: return 670...739
-        case .veryGood: return 740...799
-        case .excellent: return 800...850
-        }
-    }
-    
-    // Get interest rate modifier based on credit score
-    func interestRateModifier() -> Double {
-        switch self {
-        case .poor: return 0.05 // +5%
-        case .fair: return 0.03 // +3%
-        case .good: return 0.0 // No change
-        case .veryGood: return -0.01 // -1%
-        case .excellent: return -0.02 // -2%
-        }
-    }
-    
-    // Get description of credit score category
-    func description() -> String {
-        switch self {
-        case .poor:
-            return "Difficult to qualify for most loans and credit cards. High interest rates."
-        case .fair:
-            return "May qualify for loans but with higher interest rates."
-        case .good:
-            return "Qualify for most loans with competitive interest rates."
-        case .veryGood:
-            return "Qualify for loans with favorable terms and lower interest rates."
-        case .excellent:
-            return "Qualify for the best terms and lowest interest rates available."
-        }
-    }
+// CreditScoreCategory is already defined in Banking/Enums/Banking_OtherEnums.swift
+// Add range and description extension methods here to maintain functionality
+
+// Extension to add methods to the CreditScoreRating
+extension CreditScoreRating {
+    // These methods are now defined in CreditScore.swift
 }

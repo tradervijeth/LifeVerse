@@ -27,7 +27,7 @@ struct RefinancePropertyView: View {
     }
     
     private var currentMortgage: BankAccount? {
-        guard let mortgageId = property.mortgageId else { return nil }
+        guard let mortgageId = property.mortgageAccountId else { return nil }
         return bankManager.getAccount(id: mortgageId)
     }
     
@@ -238,13 +238,14 @@ struct RefinancePropertyView: View {
     private func calculateMortgagePayment(principal: Double, monthlyInterestRate: Double, numberOfPayments: Int) -> Double {
         // Handle edge cases
         if monthlyInterestRate <= 0 || numberOfPayments <= 0 {
-            return principal / numberOfPayments
+            return principal / Double(numberOfPayments)
         }
         
         // Standard mortgage payment formula: P * (r(1+r)^n) / ((1+r)^n - 1)
         let rate = monthlyInterestRate
-        let rateFactorNumerator = rate * pow(1 + rate, Double(numberOfPayments))
-        let rateFactorDenominator = pow(1 + rate, Double(numberOfPayments)) - 1
+        let numberOfPaymentsDouble = Double(numberOfPayments)
+        let rateFactorNumerator = rate * pow(1 + rate, numberOfPaymentsDouble)
+        let rateFactorDenominator = pow(1 + rate, numberOfPaymentsDouble) - 1
         
         return principal * (rateFactorNumerator / rateFactorDenominator)
     }

@@ -30,12 +30,12 @@ extension GameManager {
     }
 
     // Get net worth calculation
-    func calculateNetWorth() -> Double {
-        return calculateNetWorth(currentYear: currentYear)
+    func getBankingNetWorth() -> Double {
+        return getBankingNetWorthForYear(currentYear)
     }
 
     // Get net worth calculation with specific year
-    func calculateNetWorth(currentYear: Int) -> Double {
+    func getBankingNetWorthForYear(_ year: Int) -> Double {
         var netWorth = 0.0
 
         // Add character's cash
@@ -49,7 +49,7 @@ extension GameManager {
         }
 
         // Add bank accounts, investments, and property value from bank manager
-        netWorth += bankManager.calculateNetWorth(currentYear: currentYear)
+        netWorth += bankManager.calculateNetWorth()
 
         return netWorth
     }
@@ -100,7 +100,7 @@ extension GameManager {
         if result.property != nil {
             // Update character's money (the bank manager already deducted the down payment)
             if var updatedCharacter = self.character {
-                updatedCharacter.money = bankManager.getCharacterMoney()
+                updatedCharacter.money = bankManager.characterMoney
                 self.character = updatedCharacter
             }
 
@@ -166,7 +166,7 @@ extension GameManager {
         if result.success {
             // Update character's money
             if var updatedCharacter = self.character {
-                updatedCharacter.money = bankManager.getCharacterMoney()
+                updatedCharacter.money = bankManager.characterMoney
 
                 // If this was the character's residence, update residence status
                 if !property.isRental && updatedCharacter.residence == .house {
@@ -217,6 +217,19 @@ extension GameManager {
 
     // Get estimated selling price for a property
     func getEstimatedSellingPrice(propertyId: UUID) -> (min: Double, average: Double, max: Double)? {
-        return bankManager.getEstimatedSellingPrice(propertyId: propertyId, currentYear: currentYear)
+        // Find the property
+        guard let property = bankManager.propertyInvestments.first(where: { $0.id == propertyId }) else {
+            return nil
+        }
+        
+        // Get current value from property
+        let baseValue = property.currentValue
+        
+        // Calculate range based on market conditions
+        let minValue = baseValue * 0.9  // 10% below market value
+        let avgValue = baseValue
+        let maxValue = baseValue * 1.1  // 10% above market value
+        
+        return (minValue, avgValue, maxValue)
     }
 }

@@ -273,7 +273,7 @@ struct EventCardModern: View {
         case .financial: return .mint
         case .random: return .gray
         case .death: return .black
-        case .retirement: return .indigo
+        @unknown default: return .gray
         }
     }
 
@@ -288,7 +288,7 @@ struct EventCardModern: View {
         case .financial: return "dollarsign.circle.fill"
         case .random: return "questionmark.circle.fill"
         case .death: return "xmark.circle.fill"
-        case .retirement: return "house.circle.fill"
+        @unknown default: return "questionmark.circle.fill"
         }
     }
 }
@@ -302,8 +302,8 @@ struct PropertyCardModern: View {
 
     // Helper methods to move logic outside of body
     private func getMortgage() -> BankAccount? {
-        if let mortgageId = property.mortgageId {
-            return bankManager.getAccount(id: mortgageId)
+        if let mortgageAccountId = property.mortgageAccountId {
+            return bankManager.getAccount(id: mortgageAccountId)
         }
         return nil
     }
@@ -468,8 +468,9 @@ struct PropertyCardModern: View {
                 if property.isRental {
                     Divider()
 
-                    // Calculate cap rate
-                    let capRate = property.calculateCapRate() * 100
+                    // Calculate cap rate (Net Operating Income / Property Value)
+                    let netOperatingIncome = property.calculateNetAnnualIncome()
+                    let capRate = (property.currentValue > 0) ? (netOperatingIncome / property.currentValue) * 100 : 0
                     let capRateColor: Color =
                         capRate > 8 ? .green :
                         (capRate > 5 ? .yellow : .red)
@@ -648,7 +649,7 @@ struct CharacterHeaderModern: View {
                             Text("Cash")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("$\(Int(bankManager?.getCharacterMoney() ?? character.money).formattedWithSeparator())")
+                            Text("$\(Int(bankManager?.characterMoney ?? character.money).formattedWithSeparator())")
                                 .font(.headline)
                         }
                     }
